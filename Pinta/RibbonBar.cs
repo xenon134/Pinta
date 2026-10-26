@@ -39,14 +39,13 @@ internal static class RibbonBar
 	{
 		Gtk.Box group = Gtk.Box.New (Gtk.Orientation.Vertical, 0);
 		group.AddCssClass ("ribbon-group");
-		group.MarginStart = 6;
-		group.MarginEnd = 6;
+		group.MarginStart = 4;
+		group.MarginEnd = 4;
 		group.MarginTop = 2;
 		group.MarginBottom = 2;
 
 		content.Halign = Gtk.Align.Center;
 		content.Valign = Gtk.Align.Center;
-		content.Vexpand = true;
 		group.Append (content);
 
 		Gtk.Label label = Gtk.Label.New (caption);

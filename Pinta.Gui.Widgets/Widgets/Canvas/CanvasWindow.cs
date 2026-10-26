@@ -218,6 +218,8 @@ public sealed partial class CanvasWindow
 		if (drag_controller.GetStartPoint (out _, out _))
 			return;
 
+		canvas.UpdateResizeCursor (viewPos, dragging: false);
+
 		if (document.Workspace.PointInCanvas (current_canvas_pos))
 			chrome.LastCanvasCursorPoint = current_canvas_pos.ToInt ();
 
@@ -381,6 +383,13 @@ public sealed partial class CanvasWindow
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
 		PointD canvasPoint = document.Workspace.ViewPointToCanvas (viewPoint);
 
+		// The canvas edge handles take precedence over the active tool.
+		ResizeHandle resizeHandle = canvas.HitTestCanvasResizeHandle (viewPoint);
+		if (resizeHandle != ResizeHandle.None) {
+			canvas.BeginCanvasResize (resizeHandle, viewPoint);
+			return;
+		}
+
 		ToolMouseEventArgs tool_args = new () {
 			State = gesture.GetCurrentEventState (),
 			MouseButton = gesture.GetCurrentMouseButton (),
@@ -399,6 +408,11 @@ public sealed partial class CanvasWindow
 
 		// Translate coordinates to the canvas widget.
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
+
+		if (canvas.IsCanvasResizing) {
+			canvas.UpdateCanvasResize (viewPoint);
+			return;
+		}
 
 		current_canvas_pos = document.Workspace.ViewPointToCanvas (viewPoint);
 		if (document.Workspace.PointInCanvas (current_canvas_pos))
@@ -423,6 +437,12 @@ public sealed partial class CanvasWindow
 
 		// Translate coordinates to the canvas widget.
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
+
+		if (canvas.IsCanvasResizing) {
+			canvas.CommitCanvasResize ();
+			return;
+		}
+
 		PointD canvasPoint = document.Workspace.ViewPointToCanvas (viewPoint);
 
 		// Send the mouse release event to the current tool.

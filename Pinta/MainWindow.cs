@@ -480,40 +480,84 @@ internal sealed class MainWindow
 	private void CreateRibbon ()
 	{
 		Gtk.Box ribbon = window_shell.CreateToolBar ("ribbon");
-		ribbon.HeightRequest = 64;
+		ribbon.HeightRequest = 78;
 
-		// --- Selection: every tool that acts on a selection, plus moving the
-		// selected pixels (which Paint groups with the selection tools).
+		// --- Selection: the primary selection tool gets a large button, the
+		// other selection tools sit beside it, and the common selection commands
+		// follow as a compact row.
 		ToolBoxWidget selection_tools = ToolBoxWidget.New (
 			PintaCore.Tools,
-			static tool => tool.IsSelectionTool || tool is MoveSelectedTool);
-		selection_tools.SetOrientation (Gtk.Orientation.Horizontal);
+			filter: static tool => tool.IsSelectionTool || tool is MoveSelectedTool,
+			primary: static tool => tool is RectangleSelectTool);
 
-		// --- Image: canvas/image operations, equivalent to Paint's Image group.
-		Gtk.Box image_actions = RibbonBar.CreateContent ();
-		image_actions.Append (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem ());
-		image_actions.Append (PintaCore.Actions.Image.Resize.CreateToolBarItem ());
-		image_actions.Append (PintaCore.Actions.Image.CanvasSize.CreateToolBarItem ());
-		image_actions.Append (PintaCore.Actions.Image.FlipHorizontal.CreateToolBarItem ());
-		image_actions.Append (PintaCore.Actions.Image.FlipVertical.CreateToolBarItem ());
-		image_actions.Append (PintaCore.Actions.Image.RotateCW.CreateToolBarItem ());
+		Gtk.Box selection_actions = RibbonBar.CreateContent ();
+		selection_actions.Append (PintaCore.Actions.Edit.InvertSelection.CreateToolBarItem ());
+		selection_actions.Append (PintaCore.Actions.Edit.SelectAll.CreateToolBarItem ());
+		selection_actions.Append (PintaCore.Actions.Edit.Deselect.CreateToolBarItem ());
 
-		// --- Tools: everything that paints, picks colors, or creates shapes.
-		ToolBoxWidget drawing_tools = ToolBoxWidget.New (
+		Gtk.Box selection_content = RibbonBar.CreateContent ();
+		selection_content.Append (selection_tools);
+		selection_content.Append (RibbonBar.CreateSeparator ());
+		selection_content.Append (selection_actions);
+
+		// --- Image: two rows of three, like Paint's Image group.
+		Gtk.Box image_content = RibbonBar.CreateContent ();
+		Gtk.Grid image_grid = Gtk.Grid.New ();
+		image_grid.ColumnSpacing = 0;
+		image_grid.RowSpacing = 0;
+		image_grid.Attach (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem (), 0, 0, 1, 1);
+		image_grid.Attach (PintaCore.Actions.Image.Resize.CreateToolBarItem (), 1, 0, 1, 1);
+		image_grid.Attach (PintaCore.Actions.Image.CanvasSize.CreateToolBarItem (), 2, 0, 1, 1);
+		image_grid.Attach (PintaCore.Actions.Image.FlipHorizontal.CreateToolBarItem (), 0, 1, 1, 1);
+		image_grid.Attach (PintaCore.Actions.Image.FlipVertical.CreateToolBarItem (), 1, 1, 1, 1);
+		image_grid.Attach (PintaCore.Actions.Image.RotateCW.CreateToolBarItem (), 2, 1, 1, 1);
+		image_content.Append (image_grid);
+
+		// --- Tools: the everyday tools in the first row (Paint's set), with the
+		// remaining drawing/shape tools on a second row so they stay reachable.
+		ToolBoxWidget common_tools = ToolBoxWidget.New (
 			PintaCore.Tools,
-			static tool => !(tool.IsSelectionTool || tool is MoveSelectedTool));
-		drawing_tools.SetOrientation (Gtk.Orientation.Horizontal);
+			filter: IsCommonTool);
 
-		// --- Tool options: contextual controls for the active tool. Placing this
-		// in the ribbon replaces the old standalone "Tool:" strip, and matches
-		// how Paint shows tool options inline.
+		ToolBoxWidget more_tools = ToolBoxWidget.New (
+			PintaCore.Tools,
+			filter: static tool => !(tool.IsSelectionTool || tool is MoveSelectedTool) && !IsCommonTool (tool));
+
+		Gtk.Box tools_content = RibbonBar.CreateContent ();
+		Gtk.Box tools_rows = Gtk.Box.New (Gtk.Orientation.Vertical, 0);
+		tools_rows.Append (common_tools);
+		tools_rows.Append (more_tools);
+		tools_content.Append (tools_rows);
+
+		// --- Colors: the palette, moved out of the status bar.
+		StatusBarColorPaletteWidget palette = StatusBarColorPaletteWidget.New (PintaCore.Chrome, PintaCore.Palette, PintaCore.System);
+		palette.Hexpand = false;
+		palette.WidthRequest = 200;
+
+		Gtk.Box colors_content = RibbonBar.CreateContent ();
+		colors_content.Append (palette);
+
+		// --- Layers: shows/hides the right-hand pads.
+		Gtk.ToggleButton layers_button = Gtk.ToggleButton.New ();
+		layers_button.IconName = Resources.Icons.LayerDuplicate;
+		layers_button.TooltipText = Translations.GetString ("Layers");
+		layers_button.Active = PintaCore.Actions.View.ToolWindows.Value;
+		layers_button.OnToggled += (_, _) => PintaCore.Actions.View.ToolWindows.Value = layers_button.Active;
+		PintaCore.Actions.View.ToolWindows.Toggled += (value, _) => layers_button.Active = value;
+
+		Gtk.Box layers_content = RibbonBar.CreateContent ();
+		layers_content.Append (layers_button);
+
+		// --- Tool options: contextual controls for the active tool.
 		Gtk.Box tool_options = RibbonBar.CreateContent ();
 		tool_options.MarginStart = 6;
 		PintaCore.Chrome.InitializeToolToolBar (tool_options);
 
-		Gtk.Widget tools_group = RibbonBar.CreateGroup (Translations.GetString ("Tools"), drawing_tools);
-		Gtk.Widget selection_group = RibbonBar.CreateGroup (Translations.GetString ("Selection"), selection_tools);
-		Gtk.Widget image_group = RibbonBar.CreateGroup (Translations.GetString ("Image"), image_actions);
+		Gtk.Widget selection_group = RibbonBar.CreateGroup (Translations.GetString ("Selection"), selection_content);
+		Gtk.Widget image_group = RibbonBar.CreateGroup (Translations.GetString ("Image"), image_content);
+		Gtk.Widget tools_group = RibbonBar.CreateGroup (Translations.GetString ("Tools"), tools_content);
+		Gtk.Widget colors_group = RibbonBar.CreateGroup (Translations.GetString ("Colors"), colors_content);
+		Gtk.Widget layers_group = RibbonBar.CreateGroup (Translations.GetString ("Layers"), layers_content);
 
 		ribbon.Append (selection_group);
 		ribbon.Append (RibbonBar.CreateSeparator ());
@@ -522,21 +566,30 @@ internal sealed class MainWindow
 		ribbon.Append (tools_group);
 		ribbon.Append (RibbonBar.CreateSeparator ());
 		ribbon.Append (tool_options);
+		ribbon.Append (RibbonBar.CreateSeparator ());
+		ribbon.Append (colors_group);
+		ribbon.Append (RibbonBar.CreateSeparator ());
+		ribbon.Append (layers_group);
 
 		// The View > Toolbox toggle now hides the ribbon's tool group rather than
 		// the (removed) vertical tool palette.
 		PintaCore.Chrome.InitializeToolBox (tools_group);
 	}
 
+	/// <summary>
+	/// The tools that Paint surfaces directly in its Tools group.
+	/// </summary>
+	private static bool IsCommonTool (BaseTool tool)
+		=> tool is PencilTool
+			or EraserTool
+			or PaintBucketTool
+			or ColorPickerTool
+			or TextTool
+			or ZoomTool;
+
 	private void CreateStatusBar ()
 	{
 		Gtk.Box statusbar = window_shell.CreateStatusBar ("statusbar");
-
-		StatusBarColorPaletteWidget widget = StatusBarColorPaletteWidget.New (PintaCore.Chrome, PintaCore.Palette, PintaCore.System);
-		widget.Hexpand = true;
-		widget.Halign = Gtk.Align.Fill;
-
-		statusbar.Append (widget);
 
 		PintaCore.Actions.CreateStatusBar (statusbar, PintaCore.Workspace);
 

@@ -18,6 +18,13 @@
     -gtk-icon-size: 18px;
 }
 
+/* Primary tool button in a ribbon group (e.g. the rectangular selection). */
+.ribbon-group .tool-box-button.ribbon-primary-tool {
+    -gtk-icon-size: 28px;
+    min-width: 46px;
+    min-height: 46px;
+}
+
 .tool-bar-scale {
     margin-top: -4px;
     margin-bottom: -5px;

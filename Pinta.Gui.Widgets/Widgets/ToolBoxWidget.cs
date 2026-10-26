@@ -13,24 +13,37 @@ public sealed partial class ToolBoxWidget
 					   // Stores the button corresponding to each tool.
 	private readonly Dictionary<BaseTool, Gtk.ToggleButton> tool_buttons = new ();
 	// Dummy ToggleButton to use for grouping together the tools' buttons.
-	private readonly Gtk.ToggleButton toggle_group = Gtk.ToggleButton.New ();
+	// Shared across all toolboxes so that a tool in one ribbon group deactivates
+	// the selected tool in another group.
+	private static readonly Gtk.ToggleButton toggle_group = Gtk.ToggleButton.New ();
 	// Optional filter, used to build several toolboxes that each show a subset
 	// of the available tools (e.g. one per ribbon group).
 	private Func<BaseTool, bool> filter = _ => true;
+	// Optional predicate marking the tool that gets the larger "primary" button
+	// for its ribbon group.
+	private Func<BaseTool, bool> primary = _ => false;
 
 	partial void Initialize ()
 	{
-		SetOrientation (Gtk.Orientation.Vertical);
+		// Ribbon groups lay their tools out horizontally; the vertical tool
+		// palette was replaced by the ribbon.
+		SetOrientation (Gtk.Orientation.Horizontal);
 	}
 
-	public static ToolBoxWidget New (ToolManager tools, Func<BaseTool, bool>? filter = null)
+	public static ToolBoxWidget New (
+		ToolManager tools,
+		Func<BaseTool, bool>? filter = null,
+		Func<BaseTool, bool>? primary = null)
 	{
 		ToolBoxWidget widget = NewWithProperties ([]);
-		widget.Configure (tools, filter);
+		widget.Configure (tools, filter, primary);
 		return widget;
 	}
 
-	private void Configure (ToolManager tools, Func<BaseTool, bool>? filter)
+	private void Configure (
+		ToolManager tools,
+		Func<BaseTool, bool>? filter,
+		Func<BaseTool, bool>? primary)
 	{
 		tools.ToolAdded += (_, e) => HandleToolAdded (e.Tool);
 		tools.ToolRemoved += (_, e) => HandleToolRemoved (e.Tool);
@@ -38,9 +51,10 @@ public sealed partial class ToolBoxWidget
 
 		this.tools = tools;
 		this.filter = filter ?? (_ => true);
+		this.primary = primary ?? (_ => false);
 	}
 
-	private static Gtk.ToggleButton CreateToolButton (BaseTool tool)
+	private static Gtk.ToggleButton CreateToolButton (BaseTool tool, bool is_primary)
 	{
 		Gtk.ToggleButton button = Gtk.ToggleButton.New ();
 		button.IconName = tool.Icon;
@@ -48,6 +62,12 @@ public sealed partial class ToolBoxWidget
 		button.FocusOnClick = false;
 
 		button.SetCssClasses ([Resources.Styles.ToolBoxButton, AdwaitaStyles.Flat]);
+
+		if (is_primary) {
+			button.AddCssClass ("ribbon-primary-tool");
+			button.WidthRequest = 48;
+			button.HeightRequest = 48;
+		}
 
 		string shortcutText = "";
 		if (tool.ShortcutKey != Gdk.Key.Invalid) {
@@ -65,7 +85,7 @@ public sealed partial class ToolBoxWidget
 		if (!filter (tool))
 			return;
 
-		Gtk.ToggleButton toolButton = CreateToolButton (tool);
+		Gtk.ToggleButton toolButton = CreateToolButton (tool, primary (tool));
 		toolButton.Group = toggle_group;
 		toolButton.OnClicked += (_, _) => HandleToolButtonClicked (tool);
 		tool_buttons[tool] = toolButton;

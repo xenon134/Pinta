@@ -53,6 +53,8 @@ internal sealed partial class PintaCanvas
 	private uint selection_animation_timer_id;
 	private float selection_animation_dash_offset;
 
+	private readonly CanvasResizeHandles resize_handles = new ();
+
 	[MemberNotNull (nameof (cr))]
 	partial void Initialize ()
 	{
@@ -93,13 +95,72 @@ internal sealed partial class PintaCanvas
 		UpdateSelectionAnimation ();
 	}
 
+	// --- Canvas resize handles -------------------------------------------------
+	//
+	// The handles sit on the canvas edges/corners. Dragging one resizes the
+	// canvas, with the size snapped to whole pixels. While dragging, a rubber
+	// band previews the new canvas size; the resize is applied once on release
+	// so that it produces a single undo step.
+
+	internal bool IsCanvasResizing => resize_handles.IsDragging;
+
+	internal ResizeHandle HitTestCanvasResizeHandle (PointD view_point)
+		=> CanvasResizeHandles.HitTest (document.Workspace.ViewSize, view_point);
+
+	internal void BeginCanvasResize (ResizeHandle handle, PointD view_point)
+	{
+		resize_handles.Begin (handle, view_point, document.ImageSize);
+		QueueUpdate ();
+	}
+
+	internal void UpdateCanvasResize (PointD view_point)
+	{
+		if (resize_handles.Update (view_point, document.Workspace.Scale))
+			QueueUpdate ();
+	}
+
+	internal void CommitCanvasResize ()
+	{
+		Size new_size = resize_handles.PreviewSize;
+		Anchor anchor = resize_handles.TargetAnchor;
+
+		resize_handles.Cancel ();
+
+		if (new_size != document.ImageSize)
+			document.ResizeCanvas (new_size, anchor, null);
+
+		QueueUpdate ();
+	}
+
+	internal void CancelCanvasResize ()
+	{
+		resize_handles.Cancel ();
+		QueueUpdate ();
+	}
+
+	/// <summary>
+	/// Show a resize cursor when hovering a handle, and restore the default
+	/// cursor otherwise.
+	/// </summary>
+	internal void UpdateResizeCursor (PointD view_point, bool dragging)
+	{
+		ResizeHandle handle = dragging
+			? ResizeHandle.None
+			: CanvasResizeHandles.HitTest (document.Workspace.ViewSize, view_point);
+
+		string? cursor_name = CanvasResizeHandles.GetCursorName (handle);
+
+		Cursor = cursor_name is null
+			? null
+			: Gdk.Cursor.NewFromName (cursor_name, null);
+	}
+
 	/// <summary>
 	/// Queue an update to the canvas texture.
 	/// There can be multiple consecutive Invalidate() calls before a UI update, e.g.
 	/// in the text tool, or undoing multiple history items.
 	/// </summary>
-	private void OnCanvasInvalidated (object? o, CanvasInvalidatedEventArgs e)
-	{
+	private void OnCanvasInvalidated (object? o, CanvasInvalidatedEventArgs e)	{
 		RectangleI rect = e.EntireSurface
 			? new RectangleI (PointI.Zero, document.ImageSize)
 			: e.Rectangle;
@@ -160,6 +221,7 @@ internal sealed partial class PintaCanvas
 		DrawCanvasTexture (snapshot, modified_area, canvasViewBounds);
 		DrawSelection (snapshot, canvasViewBounds);
 		DrawHandles (snapshot, canvasViewBounds);
+		resize_handles.Draw (snapshot, viewSize, document.Workspace.Scale, this);
 		DrawCanvasGrid (snapshot, canvasViewBounds);
 		DrawCanvasAxonometricGrid (snapshot, canvasViewBounds);
 
