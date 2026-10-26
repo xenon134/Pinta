@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gtk;
@@ -13,26 +14,30 @@ public sealed partial class ToolBoxWidget
 	private readonly Dictionary<BaseTool, Gtk.ToggleButton> tool_buttons = new ();
 	// Dummy ToggleButton to use for grouping together the tools' buttons.
 	private readonly Gtk.ToggleButton toggle_group = Gtk.ToggleButton.New ();
+	// Optional filter, used to build several toolboxes that each show a subset
+	// of the available tools (e.g. one per ribbon group).
+	private Func<BaseTool, bool> filter = _ => true;
 
 	partial void Initialize ()
 	{
 		SetOrientation (Gtk.Orientation.Vertical);
 	}
 
-	public static ToolBoxWidget New (ToolManager tools)
+	public static ToolBoxWidget New (ToolManager tools, Func<BaseTool, bool>? filter = null)
 	{
 		ToolBoxWidget widget = NewWithProperties ([]);
-		widget.Configure (tools);
+		widget.Configure (tools, filter);
 		return widget;
 	}
 
-	private void Configure (ToolManager tools)
+	private void Configure (ToolManager tools, Func<BaseTool, bool>? filter)
 	{
 		tools.ToolAdded += (_, e) => HandleToolAdded (e.Tool);
 		tools.ToolRemoved += (_, e) => HandleToolRemoved (e.Tool);
 		tools.ToolActivated += (_, e) => HandleToolActivated (e.Tool);
 
 		this.tools = tools;
+		this.filter = filter ?? (_ => true);
 	}
 
 	private static Gtk.ToggleButton CreateToolButton (BaseTool tool)
@@ -57,6 +62,9 @@ public sealed partial class ToolBoxWidget
 
 	private void HandleToolAdded (BaseTool tool)
 	{
+		if (!filter (tool))
+			return;
+
 		Gtk.ToggleButton toolButton = CreateToolButton (tool);
 		toolButton.Group = toggle_group;
 		toolButton.OnClicked += (_, _) => HandleToolButtonClicked (tool);
@@ -64,13 +72,21 @@ public sealed partial class ToolBoxWidget
 
 		List<BaseTool> toolList = tools.ToList ();
 		int prevIndex = toolList.IndexOf (tool) - 1;
-		if (prevIndex >= 0) {
-			BaseTool prevTool = toolList[prevIndex];
-			Widget? prevSibling = tool_buttons[prevTool];
-			InsertChildAfter (toolButton, prevSibling);
-		} else {
-			Prepend (toolButton);
+
+		// Find the closest preceding tool that this (filtered) toolbox actually
+		// displays, so that tools keep their relative order within each group.
+		Widget? prevSibling = null;
+		for (int i = prevIndex; i >= 0; i--) {
+			if (tool_buttons.TryGetValue (toolList[i], out Gtk.ToggleButton? previous)) {
+				prevSibling = previous;
+				break;
+			}
 		}
+
+		if (prevSibling is not null)
+			InsertChildAfter (toolButton, prevSibling);
+		else
+			Prepend (toolButton);
 	}
 
 	private void HandleToolButtonClicked (BaseTool tool)
@@ -85,13 +101,18 @@ public sealed partial class ToolBoxWidget
 	/// </summary>
 	private void HandleToolActivated (BaseTool tool)
 	{
-		Gtk.ToggleButton toolButton = tool_buttons[tool];
+		if (!tool_buttons.TryGetValue (tool, out Gtk.ToggleButton? toolButton))
+			return;
+
 		toolButton.Active = true;
 	}
 
 	private void HandleToolRemoved (BaseTool tool)
 	{
-		Gtk.ToggleButton toolButton = tool_buttons[tool];
+		if (!tool_buttons.TryGetValue (tool, out Gtk.ToggleButton? toolButton))
+			return;
+
 		Remove (toolButton);
+		tool_buttons.Remove (tool);
 	}
 }

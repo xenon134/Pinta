@@ -31,6 +31,7 @@ using Pinta.Core;
 using Pinta.Docking;
 using Pinta.Gui.Widgets;
 using Pinta.Resources;
+using Pinta.Tools;
 
 namespace Pinta;
 
@@ -348,7 +349,7 @@ internal sealed class MainWindow
 			maximize);
 
 		CreateMainToolBar ();
-		CreateToolToolBar ();
+		CreateRibbon ();
 
 		CreatePanels ();
 		CreateStatusBar ();
@@ -476,12 +477,55 @@ internal sealed class MainWindow
 		}
 	}
 
-	private void CreateToolToolBar ()
+	private void CreateRibbon ()
 	{
-		Gtk.Box tool_toolbar = window_shell.CreateToolBar ("tool_toolbar");
-		tool_toolbar.HeightRequest = 48;
+		Gtk.Box ribbon = window_shell.CreateToolBar ("ribbon");
+		ribbon.HeightRequest = 64;
 
-		PintaCore.Chrome.InitializeToolToolBar (tool_toolbar);
+		// --- Selection: every tool that acts on a selection, plus moving the
+		// selected pixels (which Paint groups with the selection tools).
+		ToolBoxWidget selection_tools = ToolBoxWidget.New (
+			PintaCore.Tools,
+			static tool => tool.IsSelectionTool || tool is MoveSelectedTool);
+		selection_tools.SetOrientation (Gtk.Orientation.Horizontal);
+
+		// --- Image: canvas/image operations, equivalent to Paint's Image group.
+		Gtk.Box image_actions = RibbonBar.CreateContent ();
+		image_actions.Append (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem ());
+		image_actions.Append (PintaCore.Actions.Image.Resize.CreateToolBarItem ());
+		image_actions.Append (PintaCore.Actions.Image.CanvasSize.CreateToolBarItem ());
+		image_actions.Append (PintaCore.Actions.Image.FlipHorizontal.CreateToolBarItem ());
+		image_actions.Append (PintaCore.Actions.Image.FlipVertical.CreateToolBarItem ());
+		image_actions.Append (PintaCore.Actions.Image.RotateCW.CreateToolBarItem ());
+
+		// --- Tools: everything that paints, picks colors, or creates shapes.
+		ToolBoxWidget drawing_tools = ToolBoxWidget.New (
+			PintaCore.Tools,
+			static tool => !(tool.IsSelectionTool || tool is MoveSelectedTool));
+		drawing_tools.SetOrientation (Gtk.Orientation.Horizontal);
+
+		// --- Tool options: contextual controls for the active tool. Placing this
+		// in the ribbon replaces the old standalone "Tool:" strip, and matches
+		// how Paint shows tool options inline.
+		Gtk.Box tool_options = RibbonBar.CreateContent ();
+		tool_options.MarginStart = 6;
+		PintaCore.Chrome.InitializeToolToolBar (tool_options);
+
+		Gtk.Widget tools_group = RibbonBar.CreateGroup (Translations.GetString ("Tools"), drawing_tools);
+		Gtk.Widget selection_group = RibbonBar.CreateGroup (Translations.GetString ("Selection"), selection_tools);
+		Gtk.Widget image_group = RibbonBar.CreateGroup (Translations.GetString ("Image"), image_actions);
+
+		ribbon.Append (selection_group);
+		ribbon.Append (RibbonBar.CreateSeparator ());
+		ribbon.Append (image_group);
+		ribbon.Append (RibbonBar.CreateSeparator ());
+		ribbon.Append (tools_group);
+		ribbon.Append (RibbonBar.CreateSeparator ());
+		ribbon.Append (tool_options);
+
+		// The View > Toolbox toggle now hides the ribbon's tool group rather than
+		// the (removed) vertical tool palette.
+		PintaCore.Chrome.InitializeToolBox (tools_group);
 	}
 
 	private void CreateStatusBar ()
@@ -507,20 +551,8 @@ internal sealed class MainWindow
 
 	private void CreateDockAndPads (Gtk.Box container)
 	{
-		ToolBoxWidget toolbox = ToolBoxWidget.New (PintaCore.Tools);
-
-		Gtk.ScrolledWindow toolbox_scroll = Gtk.ScrolledWindow.New ();
-		toolbox_scroll.Child = toolbox;
-		toolbox_scroll.HscrollbarPolicy = Gtk.PolicyType.Never;
-		toolbox_scroll.VscrollbarPolicy = Gtk.PolicyType.Never;
-		toolbox_scroll.HasFrame = false;
-		toolbox_scroll.OverlayScrolling = true;
-		toolbox_scroll.WindowPlacement = Gtk.CornerType.BottomRight;
-
-		container.Append (toolbox_scroll);
-		PintaCore.Chrome.InitializeToolBox (toolbox);
-
-		// Dock widget
+		// The tool palette now lives in the ribbon (see CreateRibbon), so the
+		// workspace only holds the canvas and the docked pads.
 		dock = Dock.New ();
 		dock.Hexpand = true;
 		dock.Halign = Gtk.Align.Fill;

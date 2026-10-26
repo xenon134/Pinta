@@ -2,6 +2,22 @@
     -gtk-icon-size: 2rem;
 }
 
+/* Ribbon: keep each group on a single row with Paint-sized tool icons. */
+.ribbon-group .tool-box-button {
+    -gtk-icon-size: 18px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 1px;
+}
+
+.ribbon-group button {
+    padding: 2px;
+}
+
+.ribbon-group button image {
+    -gtk-icon-size: 18px;
+}
+
 .tool-bar-scale {
     margin-top: -4px;
     margin-bottom: -5px;
