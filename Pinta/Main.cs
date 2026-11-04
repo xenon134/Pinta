@@ -92,6 +92,11 @@ internal sealed class MainClass
 	{
 		GLib.UnhandledException.SetHandler (OnUnhandledException);
 
+		// Give the process its own WM_CLASS instead of inheriting "dotnet" from
+		// the runtime host. Desktop shells (e.g. XFCE's Docklike taskbar) use this
+		// to match a window to the .desktop file, which is what enables pinning.
+		GLib.Functions.SetPrgname ("pinta");
+
 		Gsk.Module.Initialize ();
 		Pango.Module.Initialize ();
 		PangoCairo.Module.Initialize ();
