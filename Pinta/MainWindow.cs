@@ -482,57 +482,87 @@ internal sealed class MainWindow
 		Gtk.Box ribbon = window_shell.CreateToolBar ("ribbon");
 		ribbon.HeightRequest = 78;
 
-		// --- Selection: the primary selection tool gets a large button, the
-		// other selection tools sit beside it, and the common selection commands
-		// follow as a compact row.
-		ToolBoxWidget selection_tools = ToolBoxWidget.New (
-			PintaCore.Tools,
-			filter: static tool => tool.IsSelectionTool || tool is MoveSelectedTool,
-			primary: static tool => tool is RectangleSelectTool);
+		// --- Selection: a single large button for the active selection tool.
+		// Its dropdown holds the other selection tools and the common commands,
+		// like Paint's combined Selection button.
+		Gtk.ToggleButton selection_button = RibbonControls.CreateBigToggle (Translations.GetString ("Selection tools"));
+		selection_button.IconName = Resources.Icons.ToolSelectRectangle;
 
-		Gtk.Box selection_actions = RibbonBar.CreateContent ();
-		selection_actions.Append (PintaCore.Actions.Edit.InvertSelection.CreateToolBarItem ());
-		selection_actions.Append (PintaCore.Actions.Edit.SelectAll.CreateToolBarItem ());
-		selection_actions.Append (PintaCore.Actions.Edit.Deselect.CreateToolBarItem ());
+		Gtk.Popover selection_popover = Gtk.Popover.New ();
+		Gtk.Box selection_menu = RibbonControls.CreateMenu ();
+		selection_popover.Child = selection_menu;
+		selection_popover.OnShow += (_, _) => PopulateSelectionMenu (selection_menu, selection_popover);
 
 		Gtk.Box selection_content = RibbonBar.CreateContent ();
-		selection_content.Append (selection_tools);
-		selection_content.Append (RibbonBar.CreateSeparator ());
-		selection_content.Append (selection_actions);
+		selection_content.Append (RibbonControls.AddChevron (selection_button, selection_popover, Translations.GetString ("Selection options")));
 
-		// --- Image: two rows of three, like Paint's Image group.
+		// --- Image: crop, rotate and mirror dropdowns, plus a placeholder for
+		// the (not yet implemented) remove background action.
 		Gtk.Box image_content = RibbonBar.CreateContent ();
 		Gtk.Grid image_grid = Gtk.Grid.New ();
 		image_grid.ColumnSpacing = 0;
 		image_grid.RowSpacing = 0;
 		image_grid.Attach (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem (), 0, 0, 1, 1);
-		image_grid.Attach (PintaCore.Actions.Image.Resize.CreateToolBarItem (), 1, 0, 1, 1);
-		image_grid.Attach (PintaCore.Actions.Image.CanvasSize.CreateToolBarItem (), 2, 0, 1, 1);
-		image_grid.Attach (PintaCore.Actions.Image.FlipHorizontal.CreateToolBarItem (), 0, 1, 1, 1);
-		image_grid.Attach (PintaCore.Actions.Image.FlipVertical.CreateToolBarItem (), 1, 1, 1, 1);
-		image_grid.Attach (PintaCore.Actions.Image.RotateCW.CreateToolBarItem (), 2, 1, 1, 1);
+
+		Gtk.Popover rotate_popover = Gtk.Popover.New ();
+		Gtk.Box rotate_menu = RibbonControls.CreateMenu ();
+		RibbonControls.AppendCommandEntry (rotate_menu, PintaCore.Actions.Image.RotateCW, rotate_popover);
+		RibbonControls.AppendCommandEntry (rotate_menu, PintaCore.Actions.Image.RotateCCW, rotate_popover);
+		RibbonControls.AppendCommandEntry (rotate_menu, PintaCore.Actions.Image.Rotate180, rotate_popover);
+		rotate_popover.Child = rotate_menu;
+		image_grid.Attach (RibbonControls.CreateMenuButton (Resources.Icons.ImageRotate90CW, Translations.GetString ("Rotate"), rotate_popover), 1, 0, 1, 1);
+
+		Gtk.Popover mirror_popover = Gtk.Popover.New ();
+		Gtk.Box mirror_menu = RibbonControls.CreateMenu ();
+		RibbonControls.AppendCommandEntry (mirror_menu, PintaCore.Actions.Image.FlipHorizontal, mirror_popover);
+		RibbonControls.AppendCommandEntry (mirror_menu, PintaCore.Actions.Image.FlipVertical, mirror_popover);
+		mirror_popover.Child = mirror_menu;
+		image_grid.Attach (RibbonControls.CreateMenuButton (Resources.Icons.ImageFlipHorizontal, Translations.GetString ("Mirror"), mirror_popover), 0, 1, 1, 1);
+
+		Gtk.Button remove_background = Gtk.Button.New ();
+		remove_background.IconName = "edit-clear-symbolic";
+		remove_background.TooltipText = Translations.GetString ("Remove background (not available yet)");
+		remove_background.Sensitive = false;
+		remove_background.SetCssClasses ([AdwaitaStyles.Flat]);
+		image_grid.Attach (remove_background, 1, 1, 1, 1);
+
 		image_content.Append (image_grid);
 
-		// --- Tools: the everyday tools in the first row (Paint's set), with the
-		// remaining drawing/shape tools on a second row so they stay reachable.
-		ToolBoxWidget common_tools = ToolBoxWidget.New (
+		// --- Tools: the everyday tools Paint shows in its Tools group.
+		ToolBoxWidget tools_box = ToolBoxWidget.New (
 			PintaCore.Tools,
-			filter: IsCommonTool);
-
-		ToolBoxWidget more_tools = ToolBoxWidget.New (
-			PintaCore.Tools,
-			filter: static tool => !(tool.IsSelectionTool || tool is MoveSelectedTool) && !IsCommonTool (tool));
+			filter: IsToolsGroupTool,
+			order: ToolsGroupOrder);
 
 		Gtk.Box tools_content = RibbonBar.CreateContent ();
-		Gtk.Box tools_rows = Gtk.Box.New (Gtk.Orientation.Vertical, 0);
-		tools_rows.Append (common_tools);
-		tools_rows.Append (more_tools);
-		tools_content.Append (tools_rows);
+		tools_content.Append (tools_box);
 
-		// --- Colors: the palette, moved out of the status bar.
+		// --- Brushes: the paintbrush plus a dropdown of its brush types.
+		Gtk.ToggleButton brushes_button = RibbonControls.CreateBigToggle (Translations.GetString ("Paintbrush"));
+		brushes_button.IconName = Resources.Icons.ToolPaintBrush;
+
+		Gtk.Popover brushes_popover = Gtk.Popover.New ();
+		Gtk.Box brushes_menu = RibbonControls.CreateMenu ();
+		brushes_popover.Child = brushes_menu;
+		brushes_popover.OnShow += (_, _) => PopulateBrushesMenu (brushes_menu, brushes_popover);
+
+		Gtk.Box brushes_content = RibbonBar.CreateContent ();
+		brushes_content.Append (RibbonControls.AddChevron (brushes_button, brushes_popover, Translations.GetString ("Brush types")));
+
+		// --- Shapes: all remaining drawing tools live in one dropdown.
+		Gtk.Popover shapes_popover = Gtk.Popover.New ();
+		Gtk.Box shapes_menu = RibbonControls.CreateMenu ();
+		shapes_popover.Child = shapes_menu;
+		shapes_popover.OnShow += (_, _) => PopulateShapesMenu (shapes_menu, shapes_popover);
+
+		Gtk.Box shapes_content = RibbonBar.CreateContent ();
+		shapes_content.Append (RibbonControls.CreateBigMenuButton (Resources.Icons.ToolRectangle, Translations.GetString ("Shapes"), shapes_popover));
+
+		// --- Colors: Pinta's palette strip, given its natural width so that no
+		// swatches are clipped.
 		StatusBarColorPaletteWidget palette = StatusBarColorPaletteWidget.New (PintaCore.Chrome, PintaCore.Palette, PintaCore.System);
 		palette.Hexpand = false;
-		palette.WidthRequest = 200;
+		palette.WidthRequest = palette.PreferredWidth + 2;
 
 		Gtk.Box colors_content = RibbonBar.CreateContent ();
 		colors_content.Append (palette);
@@ -548,44 +578,169 @@ internal sealed class MainWindow
 		Gtk.Box layers_content = RibbonBar.CreateContent ();
 		layers_content.Append (layers_button);
 
-		// --- Tool options: contextual controls for the active tool.
+		// --- Tool options: contextual controls for the active tool, pinned to
+		// the right-hand end of the ribbon.
 		Gtk.Box tool_options = RibbonBar.CreateContent ();
 		tool_options.MarginStart = 6;
+		tool_options.MarginEnd = 6;
+		tool_options.Halign = Gtk.Align.End;
 		PintaCore.Chrome.InitializeToolToolBar (tool_options);
 
 		Gtk.Widget selection_group = RibbonBar.CreateGroup (Translations.GetString ("Selection"), selection_content);
 		Gtk.Widget image_group = RibbonBar.CreateGroup (Translations.GetString ("Image"), image_content);
 		Gtk.Widget tools_group = RibbonBar.CreateGroup (Translations.GetString ("Tools"), tools_content);
+		Gtk.Widget brushes_group = RibbonBar.CreateGroup (Translations.GetString ("Brushes"), brushes_content);
+		Gtk.Widget shapes_group = RibbonBar.CreateGroup (Translations.GetString ("Shapes"), shapes_content);
 		Gtk.Widget colors_group = RibbonBar.CreateGroup (Translations.GetString ("Colors"), colors_content);
 		Gtk.Widget layers_group = RibbonBar.CreateGroup (Translations.GetString ("Layers"), layers_content);
 
-		ribbon.Append (selection_group);
-		ribbon.Append (RibbonBar.CreateSeparator ());
-		ribbon.Append (image_group);
-		ribbon.Append (RibbonBar.CreateSeparator ());
-		ribbon.Append (tools_group);
+		// The groups live in a horizontal scroller so that every control stays
+		// reachable when the window is narrower than the full ribbon, while the
+		// tool options stay pinned at the right.
+		Gtk.Box groups = Gtk.Box.New (Gtk.Orientation.Horizontal, 0);
+		groups.Valign = Gtk.Align.Center;
+
+		groups.Append (selection_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (image_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (tools_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (brushes_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (shapes_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (colors_group);
+		groups.Append (RibbonBar.CreateSeparator ());
+		groups.Append (layers_group);
+
+		Gtk.ScrolledWindow group_scroller = Gtk.ScrolledWindow.New ();
+		group_scroller.Hexpand = true;
+		group_scroller.Vexpand = false;
+		group_scroller.HscrollbarPolicy = Gtk.PolicyType.Automatic;
+		group_scroller.VscrollbarPolicy = Gtk.PolicyType.Never;
+		group_scroller.PropagateNaturalHeight = true;
+		group_scroller.Child = groups;
+		group_scroller.AddCssClass ("ribbon-scroller");
+
+		ribbon.Append (group_scroller);
 		ribbon.Append (RibbonBar.CreateSeparator ());
 		ribbon.Append (tool_options);
-		ribbon.Append (RibbonBar.CreateSeparator ());
-		ribbon.Append (colors_group);
-		ribbon.Append (RibbonBar.CreateSeparator ());
-		ribbon.Append (layers_group);
 
 		// The View > Toolbox toggle now hides the ribbon's tool group rather than
 		// the (removed) vertical tool palette.
 		PintaCore.Chrome.InitializeToolBox (tools_group);
+
+		// Keep the big Selection/Brushes buttons in sync with the active tool.
+		_ = new RibbonControls.PrimaryButtonSync (
+			PintaCore.Tools,
+			selection_button,
+			brushes_button,
+			IsToolsGroupTool);
 	}
+
+	/// <summary>
+	/// Fills the Selection dropdown. The tools are registered after the window
+	/// is created, so the menu is built the first time it is opened.
+	/// </summary>
+	private static void PopulateSelectionMenu (Gtk.Box menu, Gtk.Popover popover)
+	{
+		if (menu.GetFirstChild () is not null)
+			return;
+
+		foreach (BaseTool tool in new BaseTool?[] {
+			FindTool<RectangleSelectTool> (),
+			FindTool<EllipseSelectTool> (),
+			FindTool<LassoSelectTool> (),
+			FindTool<MagicWandTool> (),
+		}.OfType<BaseTool> ())
+			RibbonControls.AppendToolEntry (menu, PintaCore.Tools, tool, popover);
+
+		RibbonControls.AppendSeparator (menu);
+
+		foreach (BaseTool tool in new BaseTool?[] {
+			FindTool<MoveSelectionTool> (),
+			FindTool<MoveSelectedTool> (),
+		}.OfType<BaseTool> ())
+			RibbonControls.AppendToolEntry (menu, PintaCore.Tools, tool, popover);
+
+		RibbonControls.AppendSeparator (menu);
+		RibbonControls.AppendCommandEntry (menu, PintaCore.Actions.Edit.SelectAll, popover);
+		RibbonControls.AppendCommandEntry (menu, PintaCore.Actions.Edit.Deselect, popover);
+		RibbonControls.AppendCommandEntry (menu, PintaCore.Actions.Edit.InvertSelection, popover);
+	}
+
+	/// <summary>
+	/// Fills the Brushes dropdown with the available brush types.
+	/// </summary>
+	private static void PopulateBrushesMenu (Gtk.Box menu, Gtk.Popover popover)
+	{
+		if (menu.GetFirstChild () is not null)
+			return;
+
+		PaintBrushTool? brush_tool = FindTool<PaintBrushTool> ();
+		if (brush_tool is null)
+			return;
+
+		foreach (string brush_name in brush_tool.BrushNames) {
+			string name = brush_name;
+			RibbonControls.AppendLabeledEntry (menu, name, () => {
+				popover.Popdown ();
+				PintaCore.Tools.SetCurrentTool (brush_tool);
+				brush_tool.SelectBrush (name);
+			});
+		}
+	}
+
+	/// <summary>
+	/// Fills the Shapes dropdown with all remaining drawing tools.
+	/// </summary>
+	private static void PopulateShapesMenu (Gtk.Box menu, Gtk.Popover popover)
+	{
+		if (menu.GetFirstChild () is not null)
+			return;
+
+		foreach (BaseTool tool in new BaseTool?[] {
+			FindTool<GradientTool> (),
+			FindTool<LineCurveTool> (),
+			FindTool<RectangleTool> (),
+			FindTool<RoundedRectangleTool> (),
+			FindTool<EllipseTool> (),
+			FindTool<FreeformShapeTool> (),
+			FindTool<CloneStampTool> (),
+			FindTool<RecolorTool> (),
+		}.OfType<BaseTool> ())
+			RibbonControls.AppendToolEntry (menu, PintaCore.Tools, tool, popover);
+	}
+
+	/// <summary>
+	/// Looks up the instance of a tool that Pinta registered at startup.
+	/// </summary>
+	private static T? FindTool<T> () where T : BaseTool
+		=> PintaCore.Tools.OfType<T> ().FirstOrDefault ();
 
 	/// <summary>
 	/// The tools that Paint surfaces directly in its Tools group.
 	/// </summary>
-	private static bool IsCommonTool (BaseTool tool)
+	private static bool IsToolsGroupTool (BaseTool tool)
 		=> tool is PencilTool
-			or EraserTool
 			or PaintBucketTool
-			or ColorPickerTool
 			or TextTool
-			or ZoomTool;
+			or EraserTool
+			or ColorPickerTool;
+
+	/// <summary>
+	/// Left-to-right order of the Tools group, matching Paint's layout.
+	/// </summary>
+	private static int ToolsGroupOrder (BaseTool tool)
+		=> tool switch {
+			PencilTool => 0,
+			PaintBucketTool => 1,
+			TextTool => 2,
+			EraserTool => 3,
+			ColorPickerTool => 4,
+			_ => 5,
+		};
 
 	private void CreateStatusBar ()
 	{

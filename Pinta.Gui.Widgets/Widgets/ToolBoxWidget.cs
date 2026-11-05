@@ -22,6 +22,15 @@ public sealed partial class ToolBoxWidget
 	// Optional predicate marking the tool that gets the larger "primary" button
 	// for its ribbon group.
 	private Func<BaseTool, bool> primary = _ => false;
+	// Optional ordering, used when the ribbon group should show its tools in a
+	// different order than the tool manager's priority order.
+	private Func<BaseTool, int>? order;
+
+	/// <summary>
+	/// The toggle group shared by all tool buttons, so that activating a tool in
+	/// one ribbon group deactivates the tool in another.
+	/// </summary>
+	public static Gtk.ToggleButton SharedToggleGroup => toggle_group;
 
 	partial void Initialize ()
 	{
@@ -33,17 +42,19 @@ public sealed partial class ToolBoxWidget
 	public static ToolBoxWidget New (
 		ToolManager tools,
 		Func<BaseTool, bool>? filter = null,
-		Func<BaseTool, bool>? primary = null)
+		Func<BaseTool, bool>? primary = null,
+		Func<BaseTool, int>? order = null)
 	{
 		ToolBoxWidget widget = NewWithProperties ([]);
-		widget.Configure (tools, filter, primary);
+		widget.Configure (tools, filter, primary, order);
 		return widget;
 	}
 
 	private void Configure (
 		ToolManager tools,
 		Func<BaseTool, bool>? filter,
-		Func<BaseTool, bool>? primary)
+		Func<BaseTool, bool>? primary,
+		Func<BaseTool, int>? order)
 	{
 		tools.ToolAdded += (_, e) => HandleToolAdded (e.Tool);
 		tools.ToolRemoved += (_, e) => HandleToolRemoved (e.Tool);
@@ -52,6 +63,7 @@ public sealed partial class ToolBoxWidget
 		this.tools = tools;
 		this.filter = filter ?? (_ => true);
 		this.primary = primary ?? (_ => false);
+		this.order = order;
 	}
 
 	private static Gtk.ToggleButton CreateToolButton (BaseTool tool, bool is_primary)
@@ -89,6 +101,29 @@ public sealed partial class ToolBoxWidget
 		toolButton.Group = toggle_group;
 		toolButton.OnClicked += (_, _) => HandleToolButtonClicked (tool);
 		tool_buttons[tool] = toolButton;
+
+		if (order is not null) {
+			// Insert before the first displayed tool that should come after this one.
+			Widget? preceding = null;
+			int precedingOrder = int.MinValue;
+			foreach (var (existingTool, existingButton) in tool_buttons) {
+				if (existingTool == tool)
+					continue;
+
+				int existingOrder = order (existingTool);
+				if (existingOrder < order (tool) && existingOrder > precedingOrder) {
+					precedingOrder = existingOrder;
+					preceding = existingButton;
+				}
+			}
+
+			if (preceding is not null)
+				InsertChildAfter (toolButton, preceding);
+			else
+				Prepend (toolButton);
+
+			return;
+		}
 
 		List<BaseTool> toolList = tools.ToList ();
 		int prevIndex = toolList.IndexOf (tool) - 1;

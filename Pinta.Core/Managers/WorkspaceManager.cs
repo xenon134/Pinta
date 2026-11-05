@@ -406,6 +406,7 @@ public sealed class WorkspaceManager : IWorkspaceService
 	private void OnDocumentActivated (DocumentEventArgs e)
 	{
 		e.Document.SelectionChanged += (_, _) => OnSelectionChanged ();
+		e.Document.ImageSizeChanged += (_, _) => ImageSizeChanged?.Invoke (this, EventArgs.Empty);
 		DocumentActivated?.Invoke (this, e);
 	}
 
@@ -484,4 +485,5 @@ public sealed class WorkspaceManager : IWorkspaceService
 	/// </summary>
 	public event EventHandler? ActiveDocumentChanged;
 	public event EventHandler? SelectionChanged;
+	public event EventHandler? ImageSizeChanged;
 }

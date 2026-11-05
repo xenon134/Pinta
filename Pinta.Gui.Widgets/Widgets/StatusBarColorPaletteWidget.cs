@@ -37,6 +37,9 @@ namespace Pinta.Gui.Widgets;
 [GObject.Subclass<Gtk.DrawingArea>]
 public sealed partial class StatusBarColorPaletteWidget
 {
+	// The recent colours start after the primary/secondary colour box on the left.
+	private const int RECENT_START = 50;
+
 	private static bool color_picker_active = false;
 
 	private readonly RectangleD primary_rect = new (4, 3, 24, 24);
@@ -88,6 +91,22 @@ public sealed partial class StatusBarColorPaletteWidget
 		StatusBarColorPaletteWidget widget = NewWithProperties ([]);
 		widget.Configure (chrome, palette, system);
 		return widget;
+	}
+
+	/// <summary>
+	/// The width needed to show the whole palette, including the recent colours
+	/// and the current palette's swatches, without clipping any of them.
+	/// </summary>
+	public int PreferredWidth {
+		get {
+			int recent_cols = palette.MaxRecentlyUsedColor / PaletteWidget.PALETTE_ROWS;
+			int palette_cols = (palette.CurrentPalette.Colors.Count + PaletteWidget.PALETTE_ROWS - 1) / PaletteWidget.PALETTE_ROWS;
+
+			return RECENT_START
+				+ recent_cols * PaletteWidget.SWATCH_SIZE
+				+ PaletteWidget.PALETTE_MARGIN
+				+ palette_cols * PaletteWidget.SWATCH_SIZE;
+		}
 	}
 
 	private async void HandleClick (PointD point, uint button, Gdk.ModifierType state)
@@ -304,7 +323,7 @@ public sealed partial class StatusBarColorPaletteWidget
 		// Store the bounds allocated for our palette
 		int recent_cols = palette.MaxRecentlyUsedColor / PaletteWidget.PALETTE_ROWS;
 
-		recent_palette_rect = new RectangleD (50, 2, PaletteWidget.SWATCH_SIZE * recent_cols, PaletteWidget.SWATCH_SIZE * PaletteWidget.PALETTE_ROWS);
+		recent_palette_rect = new RectangleD (RECENT_START, 2, PaletteWidget.SWATCH_SIZE * recent_cols, PaletteWidget.SWATCH_SIZE * PaletteWidget.PALETTE_ROWS);
 		palette_rect = new RectangleD (
 			recent_palette_rect.Right + PaletteWidget.PALETTE_MARGIN,
 			2,

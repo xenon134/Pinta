@@ -26,6 +26,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Cairo;
 using Gtk;
@@ -82,6 +83,29 @@ public sealed class PaintBrushTool : BaseBrushTool
 	public override string StatusBarText => Translations.GetString ("Left click to draw with primary color, right click to draw with secondary color.");
 	public override Gdk.Key ShortcutKey => new (Gdk.Constants.KEY_B);
 	public override int Priority => 21;
+
+	/// <summary>
+	/// The available brush types, in the order they appear in the tool options.
+	/// </summary>
+	public IEnumerable<string> BrushNames => brushes.Select (brush => brush.Name);
+
+	/// <summary>
+	/// Selects the brush type with the given name, as used by the ribbon's
+	/// Brushes dropdown.
+	/// </summary>
+	public void SelectBrush (string name)
+	{
+		int index = 0;
+
+		foreach (BasePaintBrush brush in brushes) {
+			if (brush.Name == name) {
+				BrushComboBox.ComboBox.Active = index;
+				return;
+			}
+
+			index++;
+		}
+	}
 
 	public override Gdk.Cursor DefaultCursor {
 		get {

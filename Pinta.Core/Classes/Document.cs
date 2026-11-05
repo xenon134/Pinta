@@ -149,7 +149,22 @@ public sealed class Document
 
 	public DocumentHistory History => Workspace.History;
 
-	public Size ImageSize { get; set; }
+	private Size image_size;
+
+	/// <summary>
+	/// The size of the image, in pixels. Changing this raises
+	/// <see cref="ImageSizeChanged"/>.
+	/// </summary>
+	public Size ImageSize {
+		get => image_size;
+		set {
+			if (image_size == value)
+				return;
+
+			image_size = value;
+			ImageSizeChanged?.Invoke (this, EventArgs.Empty);
+		}
+	}
 
 	public bool IsDirty {
 		get => is_dirty;
@@ -445,4 +460,5 @@ public sealed class Document
 	public event EventHandler? Renamed;
 	public event LayerCloneEvent? LayerCloned;
 	public event EventHandler? SelectionChanged;
+	public event EventHandler? ImageSizeChanged;
 }

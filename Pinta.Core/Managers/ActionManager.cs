@@ -155,18 +155,50 @@ public sealed class ActionManager
 			cursor.SetText ($"{pt.X}, {pt.Y}");
 		};
 
-		// Selection size widget - left aligned with enough space to display coordinates up to tens of thousands (e.g. 10000, 10000).
+		// Selection size widget - blank when nothing is selected, so that it is
+		// clear whether the size refers to a selection or to the canvas.
 		statusbar.Append (Gtk.Image.NewFromIconName (Resources.Icons.ToolSelectRectangle));
-		var selection_size = Gtk.Label.New ("0, 0");
+		var selection_size = Gtk.Label.New (string.Empty);
 		selection_size.Xalign = 0.0f;
 		selection_size.Halign = Gtk.Align.Start;
 		selection_size.WidthChars = 11;
 		statusbar.Append (selection_size);
 
-		workspaceManager.SelectionChanged += delegate {
-			var bounds = workspaceManager.HasOpenDocuments ? workspaceManager.ActiveDocument.Selection.GetBounds () : new RectangleD ();
-			selection_size.SetText ($"{bounds.Width}, {bounds.Height}");
-		};
+		// Canvas size widget - always shows the size of the active image.
+		statusbar.Append (Gtk.Image.NewFromIconName (Resources.Icons.ImageResizeCanvas));
+		var canvas_size = Gtk.Label.New (string.Empty);
+		canvas_size.Xalign = 0.0f;
+		canvas_size.Halign = Gtk.Align.Start;
+		canvas_size.WidthChars = 11;
+		statusbar.Append (canvas_size);
+
+		void updateSizes ()
+		{
+			if (!workspaceManager.HasOpenDocuments) {
+				selection_size.SetText (string.Empty);
+				canvas_size.SetText (string.Empty);
+				return;
+			}
+
+			Document document = workspaceManager.ActiveDocument;
+
+			if (document.Selection.Visible) {
+				RectangleD bounds = document.Selection.GetBounds ();
+				selection_size.SetText ($"{bounds.Width}, {bounds.Height}");
+			} else {
+				selection_size.SetText (string.Empty);
+			}
+
+			canvas_size.SetText ($"{document.ImageSize.Width}, {document.ImageSize.Height}");
+		}
+
+		workspaceManager.SelectionChanged += (_, _) => updateSizes ();
+		workspaceManager.ActiveDocumentChanged += (_, _) => updateSizes ();
+		workspaceManager.ImageSizeChanged += (_, _) => updateSizes ();
+		// Catches e.g. zoom changes, which can also refresh the readouts.
+		workspaceManager.ViewSizeChanged += (_, _) => updateSizes ();
+
+		updateSizes ();
 
 		// Document zoom widget
 		View.CreateStatusBar (statusbar);
