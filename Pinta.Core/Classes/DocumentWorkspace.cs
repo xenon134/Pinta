@@ -81,10 +81,79 @@ public sealed class DocumentWorkspace
 		set {
 			if (view_size == value) return;
 			view_size = value;
+
+			// The margin depends on the view size, and must be updated before
+			// anything recalculates the scroll position.
+			UpdateViewPadding ();
+
 			OnViewSizeChanged ();
 		}
 	}
 	private Size view_size;
+
+	/// <summary>
+	/// Blank space added around the canvas on each side, in view pixels.
+	/// </summary>
+	/// <remarks>
+	/// This is applied by <see cref="UpdateViewPadding"/> so that the view can be
+	/// scrolled a little past the image edges, and must be taken into account when
+	/// converting between scroll positions and view coordinates.
+	/// </remarks>
+	public PointD ViewPadding => new (Canvas.MarginStart, Canvas.MarginTop);
+
+	/// <summary>
+	/// Extra scroll movement that still needs to be applied, in view pixels.
+	/// </summary>
+	private PointD pending_scroll_shift;
+
+	/// <summary>
+	/// Keep the canvas scrollable a little beyond its edges, so the image can be
+	/// panned past the viewport border. The margin is half of the viewport, which
+	/// means that even when scrolled all the way to an edge the image still covers
+	/// half of the viewport.
+	/// </summary>
+	/// <remarks>
+	/// This is called whenever the view size or the viewport size changes. Changing
+	/// the margin moves the canvas within the scroll area, so the scroll position is
+	/// adjusted by the same amount to avoid the image jumping. That adjustment is
+	/// deferred until the scroll area has been recalculated, since the new margin is
+	/// not taken into account until the next layout.
+	/// </remarks>
+	public void UpdateViewPadding ()
+	{
+		if (Canvas is null || Canvas.Parent is not Gtk.Viewport view)
+			return;
+
+		Gtk.Adjustment? h = view.GetHadjustment ();
+		Gtk.Adjustment? v = view.GetVadjustment ();
+
+		if (h is null || v is null)
+			return;
+
+		// Only add room when the image is larger than the viewport. Images that
+		// fit stay exactly centered and don't get scrollbars.
+		int padX = ViewSize.Width > h.PageSize ? (int) Math.Floor (h.PageSize / 2) : 0;
+		int padY = ViewSize.Height > v.PageSize ? (int) Math.Floor (v.PageSize / 2) : 0;
+
+		if (padX != Canvas.MarginStart || padY != Canvas.MarginTop) {
+			pending_scroll_shift += new PointD (padX - Canvas.MarginStart, padY - Canvas.MarginTop);
+
+			Canvas.MarginStart = Canvas.MarginEnd = padX;
+			Canvas.MarginTop = Canvas.MarginBottom = padY;
+
+			return; // Applied once the layout has taken the new margin into account.
+		}
+
+		if (pending_scroll_shift == PointD.Zero)
+			return;
+
+		// The scroll area has been recalculated, so the pending movement is now
+		// within range and can be applied without being clamped.
+		h.Value = Math.Clamp (h.Value + pending_scroll_shift.X, h.Lower, Math.Max (h.Lower, h.Upper - h.PageSize));
+		v.Value = Math.Clamp (v.Value + pending_scroll_shift.Y, v.Lower, Math.Max (v.Lower, v.Upper - v.PageSize));
+
+		pending_scroll_shift = PointD.Zero;
+	}
 
 	public DocumentHistory History { get; }
 
@@ -199,12 +268,16 @@ public sealed class DocumentWorkspace
 	public void RecenterView (PointD point)
 	{
 		Gtk.Viewport view = (Gtk.Viewport) Canvas.Parent!;
+		PointD padding = ViewPadding;
 
 		var h_adjust = view.GetHadjustment ()!;
-		h_adjust.Value = Math.Clamp (point.X * Scale - h_adjust.PageSize / 2, h_adjust.Lower, h_adjust.Upper);
+		h_adjust.Value = Math.Clamp (point.X * Scale + padding.X - h_adjust.PageSize / 2, h_adjust.Lower, h_adjust.Upper);
 
 		var v_adjust = view.GetVadjustment ()!;
-		v_adjust.Value = Math.Clamp (point.Y * Scale - v_adjust.PageSize / 2, v_adjust.Lower, v_adjust.Upper);
+		v_adjust.Value = Math.Clamp (point.Y * Scale + padding.Y - v_adjust.PageSize / 2, v_adjust.Lower, v_adjust.Upper);
+
+		// The view was positioned explicitly, taking the padding into account.
+		pending_scroll_shift = PointD.Zero;
 	}
 
 	public void ScrollCanvas (PointI delta)
@@ -255,7 +328,7 @@ public sealed class DocumentWorkspace
 
 	public void ZoomInAroundViewPoint (in PointD view_point)
 	{
-		ZoomAndRecenterView (ZoomType.ZoomIn, view_point); // Zoom in relative to mouse position.
+		ZoomAroundViewPoint (ZoomType.ZoomIn, view_point); // Zoom in relative to mouse position.
 	}
 
 	public void ZoomInAroundCanvasPoint (in PointD canvas_point)
@@ -265,12 +338,29 @@ public sealed class DocumentWorkspace
 
 	public void ZoomOutAroundViewPoint (in PointD view_point)
 	{
-		ZoomAndRecenterView (ZoomType.ZoomOut, view_point); // Zoom out relative to mouse position.
+		ZoomAroundViewPoint (ZoomType.ZoomOut, view_point); // Zoom out relative to mouse position.
 	}
 
 	public void ZoomOutAroundCanvasPoint (in PointD canvas_point)
 	{
 		ZoomOutAroundViewPoint (CanvasPointToView (canvas_point));
+	}
+
+	/// <summary>
+	/// Zoom in or out while keeping the canvas point under the given view point
+	/// in place.
+	/// </summary>
+	private void ZoomAroundViewPoint (ZoomType zoom_type, in PointD view_point)
+	{
+		Gtk.Viewport view = (Gtk.Viewport) Canvas.Parent!;
+		PointD padding = ViewPadding;
+
+		// Where the point currently appears within the viewport.
+		PointD anchor = new (
+			padding.X - view.Hadjustment!.Value + view_point.X,
+			padding.Y - view.Vadjustment!.Value + view_point.Y);
+
+		ZoomAndRecenterView (zoom_type, ViewPointToCanvas (view_point), anchor);
 	}
 
 	public void ZoomManually ()
@@ -313,17 +403,28 @@ public sealed class DocumentWorkspace
 	private void ZoomAroundCenter (ZoomType zoomType)
 	{
 		Gtk.Viewport view = (Gtk.Viewport) Canvas.Parent!;
-		PointD center = new (
-			view.Hadjustment!.Value + (view.Hadjustment.PageSize / 2.0),
-			view.Vadjustment!.Value + (view.Vadjustment.PageSize / 2.0));
-		ZoomAndRecenterView (zoomType, center);
+		PointD padding = ViewPadding;
+
+		// The center of the viewport is the anchor, and the view point it
+		// currently displays is offset by the scroll position and padding.
+		PointD anchor = new (
+			view.Hadjustment!.PageSize / 2.0,
+			view.Vadjustment!.PageSize / 2.0);
+
+		PointD center_view = new (
+			view.Hadjustment.Value + anchor.X - padding.X,
+			view.Vadjustment.Value + anchor.Y - padding.Y);
+
+		ZoomAndRecenterView (zoomType, ViewPointToCanvas (center_view), anchor);
 	}
 
 	/// <summary>
-	/// Zoom in/out around a specific point.
+	/// Zoom in or out around a specific canvas point.
 	/// </summary>
-	/// <param name="center_point">Center point to zoom around, in view coordinates</param>
-	private void ZoomAndRecenterView (ZoomType zoomType, PointD center_point)
+	/// <param name="zoomType">Direction to zoom in.</param>
+	/// <param name="canvas_point">Canvas point that should stay in place.</param>
+	/// <param name="anchor_point">Where that point currently appears in the viewport, in view pixels.</param>
+	private void ZoomAndRecenterView (ZoomType zoomType, PointD canvas_point, PointD anchor_point)
 	{
 		if (zoomType == ZoomType.ZoomOut && (ViewSize.Width == 1 || ViewSize.Height == 1))
 			return; //Can't zoom in past a 1x1 px canvas
@@ -336,11 +437,6 @@ public sealed class DocumentWorkspace
 		actions.View.SuspendZoomUpdate ();
 
 		Gtk.Viewport view = (Gtk.Viewport) Canvas.Parent!;
-
-		double scroll_offset_x = center_point.X - view.Hadjustment!.Value;
-		double scroll_offset_y = center_point.Y - view.Vadjustment!.Value;
-
-		PointD canvas_point = ViewPointToCanvas (center_point);
 
 		if (zoomType == ZoomType.ZoomIn || zoomType == ZoomType.ZoomOut) {
 
@@ -387,17 +483,22 @@ public sealed class DocumentWorkspace
 
 		actions.View.UpdateCanvasScale ();
 
+		PointD padding = ViewPadding;
+
 		// Quick fix : need to manually update Upper limit because the value is not changing after updating the canvas scale.
 		// TODO : I think there is an event need to be fired so that those values updated automatically.
-		view.Hadjustment!.Upper = ViewSize.Width < view.Hadjustment.PageSize ? view.Hadjustment.PageSize : ViewSize.Width;
-		view.Vadjustment!.Upper = ViewSize.Height < view.Vadjustment.PageSize ? view.Vadjustment.PageSize : ViewSize.Height;
+		view.Hadjustment!.Upper = Math.Max (ViewSize.Width + 2 * padding.X, view.Hadjustment.PageSize);
+		view.Vadjustment!.Upper = Math.Max (ViewSize.Height + 2 * padding.Y, view.Vadjustment.PageSize);
 
-		// Scroll so that the canvas position under 'center_point' is still the same after zooming.
-		// Note that the canvas widget might not have resized yet, so using Offset is important for taking
-		// the size difference into account.
-		PointD new_center_point = CanvasPointToView (canvas_point);
-		view.Hadjustment.Value = new_center_point.X - scroll_offset_x;
-		view.Vadjustment.Value = new_center_point.Y - scroll_offset_y;
+		// Scroll so that the canvas position under the anchor is still in the same place.
+		// Note that the canvas widget might not have resized yet, so using the anchor is
+		// important for taking the size difference into account.
+		PointD new_point = CanvasPointToView (canvas_point);
+		view.Hadjustment.Value = new_point.X + padding.X - anchor_point.X;
+		view.Vadjustment.Value = new_point.Y + padding.Y - anchor_point.Y;
+
+		// The view was positioned explicitly, taking the new padding into account.
+		pending_scroll_shift = PointD.Zero;
 
 		actions.View.ResumeZoomUpdate ();
 	}

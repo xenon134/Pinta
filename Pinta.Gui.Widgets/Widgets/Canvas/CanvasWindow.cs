@@ -167,6 +167,12 @@ public sealed partial class CanvasWindow
 		document.Workspace.ViewSizeChanged += UpdateRulerRange;
 		document.SelectionChanged += UpdateRulerSelection;
 
+		// Allow scrolling a little past the image edges. The padding itself is
+		// managed by the workspace, since it also has to adjust the scroll
+		// position and the view conversion functions.
+		scrolled_window.Hadjustment!.OnChanged += (_, _) => document.Workspace.UpdateViewPadding ();
+		scrolled_window.Vadjustment!.OnChanged += (_, _) => document.Workspace.UpdateViewPadding ();
+
 		this.chrome = chrome;
 		this.tools = tools;
 		this.document = document;
@@ -301,16 +307,16 @@ public sealed partial class CanvasWindow
 			lower = lower with { X = -offset.X / workspace.Scale };
 			upper = upper with { X = document.ImageSize.Width - lower.X };
 		} else {
-			lower = lower with { X = scrolled_window.Hadjustment.Value / workspace.Scale };
-			upper = upper with { X = (scrolled_window.Hadjustment.Value + scrolled_window.Hadjustment.PageSize) / workspace.Scale };
+			lower = lower with { X = (scrolled_window.Hadjustment.Value - workspace.ViewPadding.X) / workspace.Scale };
+			upper = upper with { X = (scrolled_window.Hadjustment.Value + scrolled_window.Hadjustment.PageSize - workspace.ViewPadding.X) / workspace.Scale };
 		}
 
 		if (offset.Y > 0) {
 			lower = lower with { Y = -offset.Y / workspace.Scale };
 			upper = upper with { Y = document.ImageSize.Height - lower.Y };
 		} else {
-			lower = lower with { Y = scrolled_window.Vadjustment.Value / workspace.Scale };
-			upper = upper with { Y = (scrolled_window.Vadjustment.Value + scrolled_window.Vadjustment.PageSize) / workspace.Scale };
+			lower = lower with { Y = (scrolled_window.Vadjustment.Value - workspace.ViewPadding.Y) / workspace.Scale };
+			upper = upper with { Y = (scrolled_window.Vadjustment.Value + scrolled_window.Vadjustment.PageSize - workspace.ViewPadding.Y) / workspace.Scale };
 		}
 
 		horizontal_ruler.RulerRange = new (lower.X, upper.X);
