@@ -160,7 +160,8 @@ internal sealed partial class PintaCanvas
 	/// There can be multiple consecutive Invalidate() calls before a UI update, e.g.
 	/// in the text tool, or undoing multiple history items.
 	/// </summary>
-	private void OnCanvasInvalidated (object? o, CanvasInvalidatedEventArgs e)	{
+	private void OnCanvasInvalidated (object? o, CanvasInvalidatedEventArgs e)
+	{
 		RectangleI rect = e.EntireSurface
 			? new RectangleI (PointI.Zero, document.ImageSize)
 			: e.Rectangle;
@@ -207,6 +208,14 @@ internal sealed partial class PintaCanvas
 	}
 
 	/// <summary>
+	/// Extra transparent space around the image, in view (device) pixels, so
+	/// that the canvas resize handles can be drawn outside the image instead of
+	/// covering its edge pixels. This must match the padding used when
+	/// converting pointer coordinates in <see cref="CanvasWindow"/>.
+	/// </summary>
+	internal const double CanvasPadding = 12.0;
+
+	/// <summary>
 	/// Update the canvas after changes to the image.
 	/// </summary>
 	private void UpdateCanvas ()
@@ -216,6 +225,14 @@ internal sealed partial class PintaCanvas
 		canvasViewBounds.Init (0.0f, 0.0f, (float) viewSize.Width, (float) viewSize.Height);
 
 		Gtk.Snapshot snapshot = Gtk.Snapshot.New ();
+
+		// Reserve a transparent margin around the image so that handles drawn
+		// on the image border are fully visible.
+		float padding = (float) CanvasPadding;
+		Graphene.Rect paddedBounds = Graphene.Rect.Alloc ();
+		paddedBounds.Init (0.0f, 0.0f, (float) viewSize.Width + 2 * padding, (float) viewSize.Height + 2 * padding);
+		snapshot.AppendColor (new Gdk.RGBA { Red = 0, Green = 0, Blue = 0, Alpha = 0 }, paddedBounds);
+		snapshot.Translate (new Graphene.Point { X = padding, Y = padding });
 
 		DrawTransparentBackground (snapshot, canvasViewBounds);
 		DrawCanvasTexture (snapshot, modified_area, canvasViewBounds);

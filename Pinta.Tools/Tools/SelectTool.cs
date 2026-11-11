@@ -141,6 +141,8 @@ public abstract class SelectTool : BaseTool
 
 	protected override void OnMouseUp (Document document, ToolMouseEventArgs e)
 	{
+		bool selection_completed = false;
+
 		PointD adjusted = AdjustMousePosition (document, e.PointDouble);
 		if (handle.HasDragged (adjusted) && handle.Rectangle.Width > 0 && handle.Rectangle.Height > 0) {
 			ReDraw (document);
@@ -155,6 +157,8 @@ public abstract class SelectTool : BaseTool
 			}
 
 			handle.EndDrag ();
+
+			selection_completed = true;
 		} else {
 			// If the user didn't move the mouse, they want to deselect
 
@@ -174,6 +178,11 @@ public abstract class SelectTool : BaseTool
 
 		// Update the mouse cursor.
 		UpdateCursor (e.WindowPoint);
+
+		// Once the selection is complete, the next thing the user usually wants
+		// to do is move it, like Paint does.
+		if (selection_completed)
+			PintaCore.Tools.SetCurrentTool (nameof (MoveSelectedTool));
 	}
 
 	protected override void OnActivated (Document? document)

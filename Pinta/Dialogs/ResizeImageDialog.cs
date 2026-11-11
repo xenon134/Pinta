@@ -192,7 +192,10 @@ public sealed partial class ResizeImageDialog
 		height_spinner.Value = settings.GetSetting (SettingNames.RESIZE_IMAGE_HEIGHT, workspace.ImageSize.Height);
 		percentage_spinner.Value = settings.GetSetting (SettingNames.RESIZE_IMAGE_PERCENTAGE, 100);
 		aspect_checkbox.Active = settings.GetSetting (SettingNames.RESIZE_IMAGE_MAINTAIN_ASPECT, true);
-		resampling_combobox.Active = settings.GetSetting (SettingNames.RESIZE_IMAGE_RESAMPLING, 0);
+		resampling_combobox.Active = Math.Clamp (
+			settings.GetSetting (SettingNames.RESIZE_IMAGE_RESAMPLING, 0),
+			0,
+			resampling_modes.Length - 1);
 
 		// Final initialization
 		if (settings.GetSetting (SettingNames.RESIZE_IMAGE_USE_PERCENTAGE, true))
@@ -230,7 +233,7 @@ public sealed partial class ResizeImageDialog
 		result.Hexpand = true;
 		result.Halign = Gtk.Align.Fill;
 
-		foreach (ResamplingMode mode in Enum.GetValues (typeof (ResamplingMode)))
+		foreach (ResamplingMode mode in resampling_modes)
 			result.AppendText (mode.GetLabel ());
 
 		result.Active = 0;
@@ -238,12 +241,20 @@ public sealed partial class ResizeImageDialog
 		return result;
 	}
 
+	// The modes offered in the dialog, in display order. Bilinear is kept in
+	// the enum for the canvas zooming code, but Bicubic supersedes it here.
+	private static readonly ResamplingMode[] resampling_modes = [
+		ResamplingMode.Bicubic,
+		ResamplingMode.NearestNeighbor,
+	];
+
 	public ResizeImageOptions GetResizeImageOptions ()
 	{
 		Size newSize = new (
 			Width: width_spinner.GetValueAsInt (),
 			Height: height_spinner.GetValueAsInt ());
-		ResamplingMode resamplingMode = (ResamplingMode) resampling_combobox.Active;
+
+		ResamplingMode resamplingMode = resampling_modes[Math.Clamp (resampling_combobox.Active, 0, resampling_modes.Length - 1)];
 		return new (newSize, resamplingMode);
 	}
 

@@ -172,17 +172,15 @@ internal sealed class CanvasResizeHandles
 	}
 
 	/// <summary>
-	/// Position of a handle in view (window) coordinates.
+	/// Position of a handle in view (window) coordinates. The centres sit on
+	/// the image border so that the handles are drawn outside the image.
 	/// </summary>
 	private static PointD GetHandleCenter (Size view_size, ResizeHandle handle)
 	{
-		double half = HANDLE_SIZE / 2.0;
-
-		// Keep the handles fully inside the canvas widget so they are not clipped.
-		double left = half;
-		double top = half;
-		double right = Math.Max (left, view_size.Width - half);
-		double bottom = Math.Max (top, view_size.Height - half);
+		double left = 0;
+		double top = 0;
+		double right = view_size.Width;
+		double bottom = view_size.Height;
 
 		double x = handle switch {
 			ResizeHandle.NW or ResizeHandle.W or ResizeHandle.SW => left,
@@ -245,7 +243,7 @@ internal sealed class CanvasResizeHandles
 			return;
 
 		if (IsDragging)
-			DrawRubberBand (snapshot, scale, widget);
+			DrawRubberBand (snapshot, view_size, scale, widget);
 
 		Gdk.RGBA fill = new () { Red = 1, Green = 1, Blue = 1, Alpha = 1 };
 		Gdk.RGBA border = new () { Red = 0.25f, Green = 0.25f, Blue = 0.25f, Alpha = 1 };
@@ -271,15 +269,21 @@ internal sealed class CanvasResizeHandles
 		}
 	}
 
-	private void DrawRubberBand (Gtk.Snapshot snapshot, double scale, Gtk.Widget widget)
+	private void DrawRubberBand (Gtk.Snapshot snapshot, Size view_size, double scale, Gtk.Widget widget)
 	{
 		float width = (float) (PreviewSize.Width * scale);
 		float height = (float) (PreviewSize.Height * scale);
 		if (width < 1 || height < 1)
 			return;
 
+		// Anchor the preview to the edge or corner that stays fixed, so that
+		// dragging the left or top handle previews the new extent on that side
+		// instead of always extending towards the right and bottom.
+		float x = IsEastAnchored ? (float) view_size.Width - width : 0;
+		float y = IsSouthAnchored ? (float) view_size.Height - height : 0;
+
 		Graphene.Rect rect = Graphene.Rect.Alloc ();
-		rect.Init (0, 0, width, height);
+		rect.Init (x, y, width, height);
 
 		Gsk.PathBuilder builder = Gsk.PathBuilder.New ();
 		builder.AddRect (rect);
@@ -290,19 +294,25 @@ internal sealed class CanvasResizeHandles
 		Gdk.RGBA accent = new () { Red = 0.0f, Green = 0.4f, Blue = 0.75f, Alpha = 1 };
 		snapshot.AppendStroke (path, stroke, accent);
 
-		DrawSizeLabel (snapshot, widget, width, height);
+		DrawSizeLabel (snapshot, widget, view_size, x, y, width, height);
 	}
 
-	private static void DrawSizeLabel (Gtk.Snapshot snapshot, Gtk.Widget widget, float width, float height)
+	private bool IsEastAnchored => TargetAnchor is Anchor.NE or Anchor.E or Anchor.SE;
+
+	private bool IsSouthAnchored => TargetAnchor is Anchor.SW or Anchor.S or Anchor.SE;
+
+	private static void DrawSizeLabel (Gtk.Snapshot snapshot, Gtk.Widget widget, Size view_size, float x, float y, float width, float height)
 	{
 		Pango.Layout layout = widget.CreatePangoLayout ($"{Math.Round (width)} × {Math.Round (height)}");
 		layout.GetPixelSize (out int textWidth, out int textHeight);
 
-		float x = Math.Max (0, width - textWidth - 12);
-		float y = Math.Max (0, height - textHeight - 12);
+		// Keep the label inside the image so that it stays visible even when
+		// the preview extends beyond the canvas.
+		float label_x = Math.Clamp (x + width - textWidth - 12, 0, Math.Max (0, (float) view_size.Width - textWidth - 8));
+		float label_y = Math.Clamp (y + height - textHeight - 12, 0, Math.Max (0, (float) view_size.Height - textHeight - 8));
 
 		Graphene.Rect background = Graphene.Rect.Alloc ();
-		background.Init (x - 4, y - 3, textWidth + 8, textHeight + 6);
+		background.Init (label_x - 4, label_y - 3, textWidth + 8, textHeight + 6);
 
 		Gsk.PathBuilder builder = Gsk.PathBuilder.New ();
 		builder.AddRect (background);
@@ -310,7 +320,7 @@ internal sealed class CanvasResizeHandles
 		snapshot.AppendFill (builder.ToPath (), Gsk.FillRule.Winding, background_colour);
 
 		snapshot.Save ();
-		snapshot.Translate (new Graphene.Point { X = x, Y = y });
+		snapshot.Translate (new Graphene.Point { X = label_x, Y = label_y });
 		Gdk.RGBA text_colour = new () { Red = 1, Green = 1, Blue = 1, Alpha = 1 };
 		snapshot.AppendLayout (layout, text_colour);
 		snapshot.Restore ();

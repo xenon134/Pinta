@@ -27,8 +27,8 @@ internal static class RibbonControls
 	{
 		Gtk.ToggleButton button = Gtk.ToggleButton.New ();
 		button.FocusOnClick = false;
-		button.WidthRequest = 54;
-		button.HeightRequest = 54;
+		button.WidthRequest = 64;
+		button.HeightRequest = 64;
 		button.TooltipText = tooltip;
 		button.SetCssClasses ([AdwaitaStyles.Flat]);
 		button.AddCssClass ("ribbon-big-button");
@@ -64,7 +64,7 @@ internal static class RibbonControls
 	public static Gtk.MenuButton CreateMenuButton (string icon, string tooltip, Gtk.Popover popover)
 	{
 		Gtk.Image image = Gtk.Image.NewFromIconName (icon);
-		image.PixelSize = 16;
+		image.PixelSize = 26;
 
 		Gtk.MenuButton button = Gtk.MenuButton.New ();
 		button.Child = image;
@@ -97,8 +97,8 @@ internal static class RibbonControls
 		button.Child = overlay;
 		button.Popover = popover;
 		button.TooltipText = tooltip;
-		button.WidthRequest = 54;
-		button.HeightRequest = 54;
+		button.WidthRequest = 64;
+		button.HeightRequest = 64;
 		button.FocusOnClick = false;
 		button.SetCssClasses ([AdwaitaStyles.Flat]);
 		button.AddCssClass ("ribbon-big-button");

@@ -523,7 +523,7 @@ internal sealed class MainWindow
 	private void CreateRibbon ()
 	{
 		Gtk.Box ribbon = window_shell.CreateToolBar ("ribbon");
-		ribbon.HeightRequest = 92;
+		ribbon.HeightRequest = 108;
 
 		// --- Selection: a single large button for the active selection tool.
 		// Its dropdown holds the other selection tools and the common commands,
@@ -543,8 +543,8 @@ internal sealed class MainWindow
 		// the (not yet implemented) remove background action.
 		Gtk.Box image_content = RibbonBar.CreateContent ();
 		Gtk.Grid image_grid = Gtk.Grid.New ();
-		image_grid.ColumnSpacing = 4;
-		image_grid.RowSpacing = 4;
+		image_grid.ColumnSpacing = 6;
+		image_grid.RowSpacing = 6;
 		image_grid.Attach (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem (), 0, 0, 1, 1);
 
 		Gtk.Popover rotate_popover = Gtk.Popover.New ();
@@ -627,6 +627,12 @@ internal sealed class MainWindow
 		tool_options.MarginStart = 6;
 		tool_options.MarginEnd = 6;
 		tool_options.Halign = Gtk.Align.End;
+		// Stop the contextual options from inheriting horizontal expand from
+		// their children: otherwise they reserve half of the ribbon's spare
+		// width while drawing right-aligned, and the group scroller is left
+		// too narrow (and shows a scrollbar even in a wide window).
+		tool_options.Hexpand = false;
+		tool_options.HexpandSet = true;
 		PintaCore.Chrome.InitializeToolToolBar (tool_options);
 
 		Gtk.Widget selection_group = RibbonBar.CreateGroup (Translations.GetString ("Selection"), selection_content);
@@ -637,11 +643,11 @@ internal sealed class MainWindow
 		Gtk.Widget colors_group = RibbonBar.CreateGroup (Translations.GetString ("Colors"), colors_content);
 		Gtk.Widget layers_group = RibbonBar.CreateGroup (Translations.GetString ("Layers"), layers_content);
 
-		// The groups live in a horizontal scroller so that every control stays
-		// reachable when the window is narrower than the full ribbon, while the
-		// tool options stay pinned at the right.
+		// The groups are laid out directly in the ribbon so that they always
+		// extend to their natural width instead of being clipped by a scroller.
 		Gtk.Box groups = Gtk.Box.New (Gtk.Orientation.Horizontal, 0);
 		groups.Valign = Gtk.Align.Center;
+		groups.Hexpand = true;
 
 		groups.Append (selection_group);
 		groups.Append (RibbonBar.CreateSeparator ());
@@ -657,6 +663,10 @@ internal sealed class MainWindow
 		groups.Append (RibbonBar.CreateSeparator ());
 		groups.Append (layers_group);
 
+		// The groups live in a horizontal scroller so that every control stays
+		// reachable when the window is narrower than the full ribbon, while the
+		// tool options stay pinned at the right. In a wide window the scroller
+		// simply expands and no scrollbar is shown.
 		Gtk.ScrolledWindow group_scroller = Gtk.ScrolledWindow.New ();
 		group_scroller.Hexpand = true;
 		group_scroller.Vexpand = false;

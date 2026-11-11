@@ -62,9 +62,11 @@ public sealed class MoveSelectedTool : BaseTransformTool
 
 	/// <summary>
 	/// Nothing can be moved unless part of the image is selected.
+	/// Note that deselecting does not clear the selection polygons: it replaces
+	/// them with a full-canvas selection that is marked as not visible.
 	/// </summary>
 	protected override bool CanStartTransform (Document document)
-		=> document.Selection.SelectionPolygons.Count > 0;
+		=> document.Selection.Visible && document.Selection.SelectionPolygons.Count > 0;
 
 	protected override void OnStartTransform (Document document)
 	{

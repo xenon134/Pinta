@@ -222,6 +222,11 @@ public class Layer : ObservableObject
 
 	public virtual void Resize (Size newSize, ResamplingMode resamplingMode)
 	{
+		if (resamplingMode == ResamplingMode.Bicubic) {
+			Surface = CairoExtensions.ResizeBicubic (Surface, newSize);
+			return;
+		}
+
 		ImageSurface dest = CairoExtensions.CreateImageSurface (
 			Format.Argb32,
 			newSize.Width,

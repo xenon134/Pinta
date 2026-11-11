@@ -137,12 +137,21 @@ public sealed class LassoSelectTool : BaseTool
 
 	protected override void OnMouseUp (Document document, ToolMouseEventArgs e)
 	{
+		bool selection_completed = false;
+
 		if (IsFreeformMode) {
+			selection_completed = lasso_polygon.Count > 1;
+
 			ApplySelection (document);
 
 			FinalizeShape (document);
 		}
 		is_dragging = false;
+
+		// Once the selection is complete, the next thing the user usually wants
+		// to do is move it, like Paint does.
+		if (selection_completed)
+			PintaCore.Tools.SetCurrentTool (nameof (MoveSelectedTool));
 	}
 
 	private void FinalizeShape (Document document)

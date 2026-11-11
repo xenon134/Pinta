@@ -37,6 +37,10 @@ public sealed class MagicWandTool : FloodTool
 
 	private CombineMode combine_mode;
 
+	// Set when a click actually produced a selection, so that releasing the
+	// mouse can switch to the tool that moves the selected pixels.
+	private bool did_select;
+
 	public MagicWandTool (IServiceProvider services) : base (services)
 	{
 		workspace = services.GetService<IWorkspaceService> ();
@@ -74,14 +78,29 @@ public sealed class MagicWandTool : FloodTool
 	protected override void OnMouseDown (Document document, ToolMouseEventArgs e)
 	{
 		combine_mode = workspace.SelectionHandler.DetermineCombineMode (e);
+		did_select = false;
 
 		base.OnMouseDown (document, e);
 
 		document.Selection.Visible = true;
 	}
 
+	protected override void OnMouseUp (Document document, ToolMouseEventArgs e)
+	{
+		base.OnMouseUp (document, e);
+
+		// Once the selection is complete, the next thing the user usually wants
+		// to do is move it, like Paint does.
+		if (did_select)
+			PintaCore.Tools.SetCurrentTool (nameof (MoveSelectedTool));
+
+		did_select = false;
+	}
+
 	protected override void OnFillRegionComputed (Document document, IReadOnlyList<IReadOnlyList<PointI>> polygonSet)
 	{
+		did_select = true;
+
 		var undoAction = new SelectionHistoryItem (workspace, Icon, Name);
 		undoAction.TakeSnapshot ();
 

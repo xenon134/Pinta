@@ -214,6 +214,7 @@ public sealed partial class CanvasWindow
 		// These coordinates are relative to our grid widget, so transform into the child image
 		// view's coordinates, and then to the canvas coordinates.
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPos);
+		viewPos = ToImageViewPoint (viewPos);
 
 		current_canvas_pos = document.Workspace.ViewPointToCanvas (viewPos);
 		horizontal_ruler.Position = current_canvas_pos.X;
@@ -387,6 +388,7 @@ public sealed partial class CanvasWindow
 		// Translate coordinates to the canvas widget.
 		PointD rootPoint = new (args.StartX, args.StartY);
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
+		viewPoint = ToImageViewPoint (viewPoint);
 		PointD canvasPoint = document.Workspace.ViewPointToCanvas (viewPoint);
 
 		// The canvas edge handles take precedence over the active tool.
@@ -414,6 +416,7 @@ public sealed partial class CanvasWindow
 
 		// Translate coordinates to the canvas widget.
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
+		viewPoint = ToImageViewPoint (viewPoint);
 
 		if (canvas.IsCanvasResizing) {
 			canvas.UpdateCanvasResize (viewPoint);
@@ -443,6 +446,7 @@ public sealed partial class CanvasWindow
 
 		// Translate coordinates to the canvas widget.
 		this.TranslateCoordinates (Canvas, rootPoint, out PointD viewPoint);
+		viewPoint = ToImageViewPoint (viewPoint);
 
 		if (canvas.IsCanvasResizing) {
 			canvas.CommitCanvasResize ();
@@ -501,4 +505,13 @@ public sealed partial class CanvasWindow
 		if (vertical_scrollbar is not null)
 			vertical_scrollbar.CanTarget = canTarget;
 	}
+
+	/// <summary>
+	/// Converts a point in the canvas widget's coordinates to the image view's
+	/// coordinates, removing the transparent margin reserved around the image.
+	/// </summary>
+	private static PointD ToImageViewPoint (PointD widgetPoint)
+		=> new (
+			widgetPoint.X - PintaCanvas.CanvasPadding,
+			widgetPoint.Y - PintaCanvas.CanvasPadding);
 }
