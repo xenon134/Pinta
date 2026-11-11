@@ -37,6 +37,8 @@ public sealed partial class ToolBoxWidget
 		// Ribbon groups lay their tools out horizontally; the vertical tool
 		// palette was replaced by the ribbon.
 		SetOrientation (Gtk.Orientation.Horizontal);
+		SetChildSpacing (4);
+		SetLineSpacing (4);
 	}
 
 	public static ToolBoxWidget New (

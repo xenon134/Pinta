@@ -4,43 +4,43 @@
 
 /* Ribbon: keep each group on a single row with Paint-sized tool icons. */
 .ribbon-group .tool-box-button {
-    -gtk-icon-size: 18px;
-    min-width: 24px;
-    min-height: 24px;
-    padding: 1px;
+    -gtk-icon-size: 22px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
 }
 
 .ribbon-group button {
-    padding: 2px;
+    padding: 4px;
 }
 
 .ribbon-group button image {
-    -gtk-icon-size: 18px;
+    -gtk-icon-size: 22px;
 }
 
 /* Primary tool button in a ribbon group (e.g. the rectangular selection). */
 .ribbon-group .tool-box-button.ribbon-primary-tool {
-    -gtk-icon-size: 28px;
-    min-width: 46px;
-    min-height: 46px;
+    -gtk-icon-size: 34px;
+    min-width: 52px;
+    min-height: 52px;
 }
 
 /* Large primary buttons in the ribbon (Selection, Brushes, Shapes). */
 .ribbon-group button.ribbon-big-button {
-    -gtk-icon-size: 28px;
-    min-width: 46px;
-    min-height: 46px;
-    padding: 2px;
+    -gtk-icon-size: 34px;
+    min-width: 54px;
+    min-height: 54px;
+    padding: 3px;
 }
 
 .ribbon-group button.ribbon-big-button image {
-    -gtk-icon-size: 28px;
+    -gtk-icon-size: 34px;
 }
 
 /* Small dropdown chevron drawn in the corner of a big ribbon button. */
 .ribbon-group button.ribbon-chevron {
-    min-width: 12px;
-    min-height: 12px;
+    min-width: 14px;
+    min-height: 14px;
     padding: 0;
     margin: 0;
     background: none;
@@ -48,19 +48,19 @@
 }
 
 .ribbon-group button.ribbon-chevron image {
-    -gtk-icon-size: 12px;
+    -gtk-icon-size: 14px;
 }
 
 /* Compact icon buttons that open a dropdown (rotate, mirror). */
 .ribbon-group button.ribbon-menu-button {
-    min-width: 24px;
-    min-height: 24px;
-    padding: 2px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 4px;
 }
 
 /* Entries in the ribbon's dropdown menus: give them room to breathe. */
 .ribbon-menu button {
-    padding: 5px 8px;
+    padding: 6px 10px;
 }
 
 .tool-bar-scale {

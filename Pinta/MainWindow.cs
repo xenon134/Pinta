@@ -49,6 +49,8 @@ internal sealed class MainWindow
 
 	private int main_thread_id = -1;
 	private Gtk.DropTarget drop_target = null!;
+	// The most recently used selection tool, used by the 'S' shortcut.
+	private BaseTool? last_selection_tool;
 
 	public MainWindow (Adw.Application app)
 	{
@@ -122,6 +124,9 @@ internal sealed class MainWindow
 		PintaCore.Actions.View.ZoomToSelection.Activated += ZoomToSelection_Activated;
 
 		PintaCore.Workspace.ActiveDocumentChanged += ActiveDocumentChanged;
+
+		PintaCore.Tools.ToolActivated += (_, e) => HandleToolActivated (e.Tool);
+		HandleToolActivated (PintaCore.Tools.CurrentTool);
 
 		PintaCore.Workspace.DocumentActivated += Workspace_DocumentCreated;
 		PintaCore.Workspace.DocumentClosed += Workspace_DocumentClosed;
@@ -253,6 +258,13 @@ internal sealed class MainWindow
 			}
 		}
 
+		// 'S' toggles between the last selection tool and Move Selected Pixels,
+		// rather than cycling through all of the selection tools.
+		if (!args.State.HasModifierKey ()
+			&& args.GetKey ().ToUpper ().Value == Gdk.Constants.KEY_S
+			&& ToggleSelectionAndMove ())
+			return true;
+
 		// If the canvas/tool didn't consume it, see if its a toolbox shortcut
 		if (!args.State.HasModifierKey () && PintaCore.Tools.SetCurrentTool (args.GetKey ()))
 			return true;
@@ -267,6 +279,37 @@ internal sealed class MainWindow
 
 		// We return 'false' to indicate that nobody consumed it
 		return false;
+	}
+
+	/// <summary>
+	/// Handles the 'S' shortcut: toggle between the most recently used selection
+	/// tool and the tool that moves the selected pixels.
+	/// </summary>
+	private bool ToggleSelectionAndMove ()
+	{
+		if (PintaCore.Tools.CurrentTool is MoveSelectedTool) {
+			BaseTool? selection_tool = last_selection_tool
+				?? PintaCore.Tools.OfType<RectangleSelectTool> ().FirstOrDefault ();
+
+			if (selection_tool is null)
+				return false;
+
+			PintaCore.Tools.SetCurrentTool (selection_tool);
+			return true;
+		}
+
+		BaseTool? move_tool = PintaCore.Tools.OfType<MoveSelectedTool> ().FirstOrDefault ();
+		if (move_tool is null)
+			return false;
+
+		PintaCore.Tools.SetCurrentTool (move_tool);
+		return true;
+	}
+
+	private void HandleToolActivated (BaseTool? tool)
+	{
+		if (tool is RectangleSelectTool or EllipseSelectTool or LassoSelectTool or MagicWandTool)
+			last_selection_tool = tool;
 	}
 
 	private void HandleGlobalKeyRelease (
@@ -480,7 +523,7 @@ internal sealed class MainWindow
 	private void CreateRibbon ()
 	{
 		Gtk.Box ribbon = window_shell.CreateToolBar ("ribbon");
-		ribbon.HeightRequest = 78;
+		ribbon.HeightRequest = 92;
 
 		// --- Selection: a single large button for the active selection tool.
 		// Its dropdown holds the other selection tools and the common commands,
@@ -500,8 +543,8 @@ internal sealed class MainWindow
 		// the (not yet implemented) remove background action.
 		Gtk.Box image_content = RibbonBar.CreateContent ();
 		Gtk.Grid image_grid = Gtk.Grid.New ();
-		image_grid.ColumnSpacing = 0;
-		image_grid.RowSpacing = 0;
+		image_grid.ColumnSpacing = 4;
+		image_grid.RowSpacing = 4;
 		image_grid.Attach (PintaCore.Actions.Image.CropToSelection.CreateToolBarItem (), 0, 0, 1, 1);
 
 		Gtk.Popover rotate_popover = Gtk.Popover.New ();

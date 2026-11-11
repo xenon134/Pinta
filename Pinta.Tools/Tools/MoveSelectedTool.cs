@@ -60,15 +60,15 @@ public sealed class MoveSelectedTool : BaseTransformTool
 	protected override RectangleD GetSourceRectangle (Document document)
 		=> document.Selection.GetBounds ();
 
+	/// <summary>
+	/// Nothing can be moved unless part of the image is selected.
+	/// </summary>
+	protected override bool CanStartTransform (Document document)
+		=> document.Selection.SelectionPolygons.Count > 0;
+
 	protected override void OnStartTransform (Document document)
 	{
 		base.OnStartTransform (document);
-
-		// If there is no selection, select the whole image.
-		if (document.Selection.SelectionPolygons.Count == 0) {
-			RectangleD imageBounds = new (0, 0, document.ImageSize.Width, document.ImageSize.Height);
-			document.Selection.CreateRectangleSelection (imageBounds);
-		}
 
 		original_selection = document.Selection.Clone ();
 		original_transform.InitMatrix (document.Layers.SelectionLayer.Transform);

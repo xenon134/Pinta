@@ -27,8 +27,8 @@ internal static class RibbonControls
 	{
 		Gtk.ToggleButton button = Gtk.ToggleButton.New ();
 		button.FocusOnClick = false;
-		button.WidthRequest = 48;
-		button.HeightRequest = 48;
+		button.WidthRequest = 54;
+		button.HeightRequest = 54;
 		button.TooltipText = tooltip;
 		button.SetCssClasses ([AdwaitaStyles.Flat]);
 		button.AddCssClass ("ribbon-big-button");
@@ -97,8 +97,8 @@ internal static class RibbonControls
 		button.Child = overlay;
 		button.Popover = popover;
 		button.TooltipText = tooltip;
-		button.WidthRequest = 48;
-		button.HeightRequest = 48;
+		button.WidthRequest = 54;
+		button.HeightRequest = 54;
 		button.FocusOnClick = false;
 		button.SetCssClasses ([AdwaitaStyles.Flat]);
 		button.AddCssClass ("ribbon-big-button");

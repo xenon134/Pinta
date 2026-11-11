@@ -39,10 +39,10 @@ internal static class RibbonBar
 	{
 		Gtk.Box group = Gtk.Box.New (Gtk.Orientation.Vertical, 0);
 		group.AddCssClass ("ribbon-group");
-		group.MarginStart = 4;
-		group.MarginEnd = 4;
-		group.MarginTop = 2;
-		group.MarginBottom = 2;
+		group.MarginStart = 6;
+		group.MarginEnd = 6;
+		group.MarginTop = 3;
+		group.MarginBottom = 3;
 
 		content.Halign = Gtk.Align.Center;
 		content.Valign = Gtk.Align.Center;
@@ -65,8 +65,8 @@ internal static class RibbonBar
 		Gtk.Separator separator = Gtk.Separator.New (Gtk.Orientation.Vertical);
 		separator.MarginTop = 6;
 		separator.MarginBottom = 6;
-		separator.MarginStart = 2;
-		separator.MarginEnd = 2;
+		separator.MarginStart = 4;
+		separator.MarginEnd = 4;
 		return separator;
 	}
 

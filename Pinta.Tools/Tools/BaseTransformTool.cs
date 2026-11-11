@@ -55,6 +55,9 @@ public abstract class BaseTransformTool : BaseTool
 		if (IsActive)
 			return;
 
+		if (!CanStartTransform (document))
+			return;
+
 		original_point = e.PointDouble;
 
 		if (!document.Workspace.PointInCanvas (e.PointDouble))
@@ -168,6 +171,9 @@ public abstract class BaseTransformTool : BaseTool
 				return base.OnKeyDown (document, e);
 		}
 
+		if (!CanStartTransform (document))
+			return false;
+
 		if (!IsActive) {
 			is_dragging = true;
 			OnStartTransform (document);
@@ -190,6 +196,13 @@ public abstract class BaseTransformTool : BaseTool
 	}
 
 	protected abstract RectangleD GetSourceRectangle (Document document);
+
+	/// <summary>
+	/// Whether a transform can be started on the given document, e.g. whether
+	/// there is selected content to move.
+	/// </summary>
+	protected virtual bool CanStartTransform (Document document)
+		=> true;
 
 	protected virtual void OnStartTransform (Document document)
 	{
