@@ -110,12 +110,13 @@ internal static class RibbonControls
 	/// </summary>
 	public static Gtk.Box CreateMenu ()
 	{
-		Gtk.Box menu = Gtk.Box.New (Gtk.Orientation.Vertical, 2);
+		Gtk.Box menu = Gtk.Box.New (Gtk.Orientation.Vertical, 6);
+		menu.AddCssClass ("ribbon-menu");
 		menu.MarginStart = 6;
 		menu.MarginEnd = 6;
 		menu.MarginTop = 6;
 		menu.MarginBottom = 6;
-		menu.WidthRequest = 190;
+		menu.WidthRequest = 210;
 		return menu;
 	}
 

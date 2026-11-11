@@ -58,6 +58,11 @@
     padding: 2px;
 }
 
+/* Entries in the ribbon's dropdown menus: give them room to breathe. */
+.ribbon-menu button {
+    padding: 5px 8px;
+}
+
 .tool-bar-scale {
     margin-top: -4px;
     margin-bottom: -5px;

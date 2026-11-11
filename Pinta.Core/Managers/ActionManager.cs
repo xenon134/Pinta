@@ -142,6 +142,19 @@ public sealed class ActionManager
 
 	public void CreateStatusBar (Gtk.Box statusbar, WorkspaceManager workspaceManager)
 	{
+		// Active tool widget - shows which tool is currently in use.
+		Gtk.Image tool_icon = Gtk.Image.NewFromIconName (Resources.Icons.ToolPaintBrush);
+		var tool_name = Gtk.Label.New (string.Empty);
+		tool_name.Xalign = 0.0f;
+		tool_name.Halign = Gtk.Align.Start;
+		statusbar.Append (tool_icon);
+		statusbar.Append (tool_name);
+
+		PintaCore.Tools.ToolActivated += (_, e) => {
+			tool_icon.IconName = e.Tool.Icon;
+			tool_name.SetText (e.Tool.Name);
+		};
+
 		// Cursor position widget - left aligned with enough space to display coordinates up to tens of thousands (e.g. 10000, 10000).
 		statusbar.Append (Gtk.Image.NewFromIconName (Resources.Icons.CursorPosition));
 		var cursor = Gtk.Label.New ("0, 0");
